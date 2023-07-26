@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyproteonet"
+version = "0.0.1"
+dependencies = [
+    "numpy",
+    "pandas",
+    "torch",
+    "matplotlib",
+    "scikit-learn",
+    "lightning",
+    "tqdm",
+    "pybiomart",
+    "psutil",
+    "ray",
+    "matplotlib",
+    "seaborn",
+    "lightning",
+    "tables",
+    "pyopenms"
+]

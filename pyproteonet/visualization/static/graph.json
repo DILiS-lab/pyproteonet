@@ -1,0 +1,4 @@
+{
+    "nodes": [{"group":0, "label":"1", "tt":"Protein"}, {"group":0, "label":"2", "tt":"Protein"}, {"group":0, "label":"3", "tt":"Protein"}, {"group":0, "label":"X", "tt":"Protein"}],
+    "edges": [{"from":0, "to": 1}, {"from": 1, "to": 2}]
+}
