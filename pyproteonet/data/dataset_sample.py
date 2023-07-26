@@ -128,6 +128,13 @@ class DatasetSample:
             target_column=target_column
         )
 
+    def get_values(self, molecule: str, column: str = 'abundance', return_missing_mask: bool = False):
+        values = self.values[molecule][column].to_numpy()
+        if return_missing_mask:
+            return values, self.missing_mask(molecule=molecule, column=column)
+        else:
+            return values
+
     def plot_hist(self, bins="auto"):
         keys = list(self.values.keys())
         fig, ax = plt.subplots(1, len(keys))

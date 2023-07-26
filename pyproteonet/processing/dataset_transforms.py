@@ -5,12 +5,14 @@ import pandas as pd
 
 from ..data.dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
+
 if TYPE_CHECKING:
     from ..data.dataset import Dataset
 
 
-def apply(data: Union[DatasetSample, 'Dataset'], dataset_fn: Callable, *args, **kwargs):
+def apply(data: Union[DatasetSample, "Dataset"], dataset_fn: Callable, *args, **kwargs):
     return data.apply(dataset_fn, *args, **kwargs)
+
 
 def _normalize(ds: DatasetSample, molecules: Optional[Iterable[str]] = None, columns: Optional[List[str]] = None):
     ds = ds.copy()
@@ -25,10 +27,21 @@ def _normalize(ds: DatasetSample, molecules: Optional[Iterable[str]] = None, col
             df.loc[:, column] = (df.loc[:, column] - df.loc[:, column].mean()) / df.loc[:, column].std()
     return ds
 
-def normalize(data: Union[DatasetSample, 'Dataset'], molecules: Optional[Iterable[str]] = None, columns: Optional[Iterable[str]] = None):
+
+def normalize(
+    data: Union[DatasetSample, "Dataset"],
+    molecules: Optional[Iterable[str]] = None,
+    columns: Optional[Iterable[str]] = None,
+):
     return data.apply(_normalize, molecules=molecules, columns=columns)
 
-def _logarithmize(ds: DatasetSample, molecules: Optional[Iterable[str]] = None, columns: Optional[Iterable[str]] = None, epsilon:float=1e-8):
+
+def _logarithmize(
+    ds: DatasetSample,
+    molecules: Optional[Iterable[str]] = None,
+    columns: Optional[Iterable[str]] = None,
+    epsilon: float = 0.0,
+):
     ds = ds.copy()
     if molecules is None:
         molecules = ds.values.keys()
@@ -43,14 +56,22 @@ def _logarithmize(ds: DatasetSample, molecules: Optional[Iterable[str]] = None, 
             mask = ~ds.missing_mask(molecule=molecule, column=column)
             res = np.log(df.loc[mask, column] + epsilon)
             if np.isnan(res).any():
-                raise ValueError('Log resutled in NaN values!')
+                raise ValueError("Log resutled in NaN values!")
             df.loc[mask, column] = res
     return ds
 
-def logarithmize(data: Union[DatasetSample, 'Dataset'], molecules: Optional[Iterable[str]] = None, columns: Optional[Iterable[str]] = None):
+
+def logarithmize(
+    data: Union[DatasetSample, "Dataset"],
+    molecules: Optional[Iterable[str]] = None,
+    columns: Optional[Iterable[str]] = None,
+):
     return apply(data, _logarithmize, molecules=molecules, columns=columns)
 
-def _rename_values(sample: DatasetSample, columns: Dict[str, str], molecules: Optional[Iterable[str]] = None, inplace: bool = False):
+
+def _rename_values(
+    sample: DatasetSample, columns: Dict[str, str], molecules: Optional[Iterable[str]] = None, inplace: bool = False
+):
     if not inplace:
         sample = sample.copy()
     if molecules is None:
@@ -59,12 +80,21 @@ def _rename_values(sample: DatasetSample, columns: Dict[str, str], molecules: Op
         sample.values[mol].rename(columns=columns, inplace=True)
     return sample
 
-def rename_values(data: Union[DatasetSample, 'Dataset'], columns: Dict[str, str], molecules: Optional[Iterable[str]] = None, inplace: bool = False):
+
+def rename_values(
+    data: Union[DatasetSample, "Dataset"],
+    columns: Dict[str, str],
+    molecules: Optional[Iterable[str]] = None,
+    inplace: bool = False,
+):
     res = apply(data, _rename_values, columns=columns, molecules=molecules, inplace=inplace)
     if not inplace:
         return res
-        
-def _drop_values(sample: DatasetSample, columns: List[str], molecules: Optional[Iterable[str]] = None, inplace: bool = False):
+
+
+def _drop_values(
+    sample: DatasetSample, columns: List[str], molecules: Optional[Iterable[str]] = None, inplace: bool = False
+):
     if not inplace:
         sample = sample.copy()
     if molecules is None:
@@ -73,7 +103,13 @@ def _drop_values(sample: DatasetSample, columns: List[str], molecules: Optional[
         sample.values[mol].drop(columns=columns, inplace=True)
     return sample
 
-def drop_values(data: Union[DatasetSample, 'Dataset'], columns: Iterable[str], molecules: Optional[Iterable[str]] = None, inplace: bool = False):
+
+def drop_values(
+    data: Union[DatasetSample, "Dataset"],
+    columns: Iterable[str],
+    molecules: Optional[Iterable[str]] = None,
+    inplace: bool = False,
+):
     res = apply(data, _drop_values, columns=columns, molecules=molecules, inplace=inplace)
     if not inplace:
         return res

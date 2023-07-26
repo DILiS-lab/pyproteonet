@@ -6,42 +6,43 @@ from pandas.core.groupby.generic import SeriesGroupBy
 from tqdm.auto import tqdm
 
 from ..data.dataset import Dataset
-from .molecule_set_transforms import num_theoretical_peptides
 
 
 def aggregate_peptides(
     dataset: Dataset,
     aggregation_fn: Callable[[SeriesGroupBy], pd.Series],
-    only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
+    only_unique: bool = True,
     inplace: bool = False,
     tqdm_bar: bool = False,
 ) -> Optional[Dataset]:
     if not inplace:
         dataset = dataset.copy()
-    mapped = dataset.molecule_set.get_mapped_pairs("protein", "peptide", mapping=mapping)
+    mapped = dataset.molecule_set.get_mapped_pairs(result_molecule, input_molecule, mapping=mapping)
     unique_peptides = []
     if only_unique:
-        unique_peptides = mapped.groupby("peptide").protein.count()
+        unique_peptides = mapped.groupby(input_molecule)[result_molecule].count()
         unique_peptides = unique_peptides[unique_peptides == 1].index
     for sample in tqdm(dataset.samples) if tqdm_bar else dataset.samples:
         sample_mapping = mapped.copy()
-        sample_mapping["peptide_abundance"] = (
-            sample.values["peptide"].loc[sample_mapping.peptide, input_column].to_numpy()
+        sample_mapping["val"] = (
+            sample.values[input_molecule].loc[sample_mapping[input_molecule], input_column].to_numpy()
         )
         sample_mapping["missing"] = (
-            sample.missing_mask(molecule="peptide", column=input_column).loc[sample_mapping.peptide].to_numpy()
+            sample.missing_mask(molecule=input_molecule, column=input_column).loc[sample_mapping[input_molecule]].to_numpy()
         )
         sample_mapping = sample_mapping[~sample_mapping["missing"]]
-        # sample_mapping.sort_values('peptide_abundance', inplace=True, ascending=False)
+        # sample_mapping.sort_values('val', inplace=True, ascending=False)
         if only_unique:
-            sample_mapping = sample_mapping[sample_mapping.peptide.isin(unique_peptides)]
-        groups = sample_mapping.groupby("protein").peptide_abundance
+            sample_mapping = sample_mapping[sample_mapping[input_molecule].isin(unique_peptides)]
+        groups = sample_mapping.groupby(result_molecule).val
         res = aggregation_fn(groups)
-        sample.values["protein"].loc[:, result_column] = dataset.missing_value
-        sample.values["protein"].loc[res.index, result_column] = res
+        sample.values[result_molecule][result_column] = dataset.missing_value
+        sample.values[result_molecule][result_column] = res
     if not inplace:
         return dataset
 
@@ -49,7 +50,9 @@ def aggregate_peptides(
 def mean(
     dataset: Dataset,
     only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
     inplace: bool = False,
@@ -62,7 +65,9 @@ def mean(
         dataset=dataset,
         aggregation_fn=_mean,
         only_unique=only_unique,
+        input_molecule=input_molecule,
         input_column=input_column,
+        result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
         inplace=inplace,
@@ -73,7 +78,9 @@ def mean(
 def median(
     dataset: Dataset,
     only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
     inplace: bool = False,
@@ -86,7 +93,9 @@ def median(
         dataset=dataset,
         aggregation_fn=_median,
         only_unique=only_unique,
+        input_molecule=input_molecule,
         input_column=input_column,
+        result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
         inplace=inplace,
@@ -97,7 +106,9 @@ def median(
 def sum(
     dataset: Dataset,
     only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
     inplace: bool = False,
@@ -110,7 +121,9 @@ def sum(
         dataset=dataset,
         aggregation_fn=_sum,
         only_unique=only_unique,
+        input_molecule=input_molecule,
         input_column=input_column,
+        result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
         inplace=inplace,
@@ -121,7 +134,9 @@ def sum(
 def minimum(
     dataset: Dataset,
     only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
     inplace: bool = False,
@@ -134,7 +149,9 @@ def minimum(
         dataset=dataset,
         aggregation_fn=_min,
         only_unique=only_unique,
+        input_molecule=input_molecule,
         input_column=input_column,
+        result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
         inplace=inplace,
@@ -145,7 +162,9 @@ def minimum(
 def maximum(
     dataset: Dataset,
     only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
     inplace: bool = False,
@@ -158,7 +177,9 @@ def maximum(
         dataset=dataset,
         aggregation_fn=_max,
         only_unique=only_unique,
+        input_molecule=input_molecule,
         input_column=input_column,
+        result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
         inplace=inplace,
@@ -170,7 +191,9 @@ def top_n_mean(
     dataset: Dataset,
     top_n: int = 3,
     only_unique: bool = True,
+    input_molecule: str = 'peptide',
     input_column: str = "abundance",
+    result_molecule: str = 'protein',
     result_column: str = "abundance",
     mapping: str = "protein",
     inplace: bool = False,
@@ -183,38 +206,13 @@ def top_n_mean(
         dataset=dataset,
         aggregation_fn=_top_n_mean,
         only_unique=only_unique,
+        input_molecule=input_molecule,
         input_column=input_column,
+        result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
         inplace=inplace,
         tqdm_bar=tqdm_bar,
     )
-
-
-def iBAQ(
-    dataset: Dataset,
-    input_column: str = 'abundance',
-    sequence_column: str = "sequence",
-    enzyme: str = "Trypsin",
-    min_peptide_length: int = 6,
-    max_peptide_length: int = 30,
-    result_column: str = "abundance",
-    only_unique: bool = False,
-    mapping: str = 'protein',
-    inplace: bool = False,
-    tqdm_bar: bool = False
-):
-    num_peptides = num_theoretical_peptides(molecule_set=dataset.molecule_set, min_peptide_length=min_peptide_length, max_peptide_length=max_peptide_length,
-        enzyme=enzyme, sequence_column=sequence_column, result_column=None)
-    res = sum(dataset=dataset, only_unique=only_unique, input_column=input_column, result_column=result_column, mapping=mapping, inplace=inplace, tqdm_bar=tqdm_bar)
-    if not inplace:
-        dataset = res # type: ignore
-    for sample in dataset.samples:
-        prot_vals = sample.values['protein']
-        prot_vals[result_column] /= num_peptides.loc[prot_vals.index]
-        mask = prot_vals[result_column] == np.inf
-        prot_vals.loc[mask, result_column] = dataset.missing_value
-    if not inplace:
-        return dataset
     
     

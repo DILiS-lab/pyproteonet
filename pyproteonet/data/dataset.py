@@ -81,6 +81,9 @@ class Dataset:
     def create_sample(self, name: str, values: Dict[str, pd.DataFrame]):
         if name in self.samples_dict:
             KeyError(f"Sample with name {name} already exists.")
+        for mol, mol_df in self.molecules.items():
+            if mol not in values:
+                values[mol] = pd.DataFrame(index=mol_df.index)
         self.samples_dict[name] = DatasetSample(dataset=self, values=values)
 
     @property
@@ -124,15 +127,15 @@ class Dataset:
             molecule_set = molecule_set.copy()
         return Dataset(molecule_set=molecule_set, samples=copied)
 
-    def get_values(self, molecule_name: str, column: str = 'abundance', return_missing_mask: bool = False):
+    def all_values(self, molecule: str, column: str = 'abundance', return_missing_mask: bool = False):
         values = []
         mask = []
         for sample in self.samples_dict.values():
-            v = sample.values[molecule_name][column].to_numpy()
+            v = sample.values[molecule][column]
             values.append(v)
             if return_missing_mask:
                 mask.append(eq_nan(v, sample.missing_abundance_value))
-        values = np.concatenate(values)
+        values = pd.concat(values)
         if return_missing_mask:
             return values, np.concatenate(mask)
         return values
@@ -167,23 +170,13 @@ class Dataset:
     def calculate_hist(
         self, molecule_name: str, bins="auto"
     ) -> Tuple[np.ndarray, np.ndarray]:
-        values, mask = self.get_values(
-            molecule_name=molecule_name, return_missing_mask=True
+        values, mask = self.all_values(
+            molecule=molecule_name, return_missing_mask=True
         )
         existing = values[~mask]
         bin_edges = np.histogram_bin_edges(existing, bins=bins)
         hist = np.histogram(values, bins=bin_edges)
         return hist
-
-    def plot_hist(self, molecule_name: str, column: str = 'abundance', bins="auto", ax=None):
-        if ax is None:
-            fig, ax = plt.subplots()
-        values, mask = self.get_values(
-            molecule_name=molecule_name, return_missing_mask=True, column=column
-        )
-        missing_percent = mask.sum() / values.shape[0] * 100
-        sbn.histplot(values[~mask], ax=ax, bins=bins)
-        ax.set_title(f"{molecule_name}({column}) ({round(missing_percent, 1)}% missing)")
 
     def plot_correlation(self, molecule: str, column_x: str, column_y: str,
                           samples: Optional[List[str]] = None, ax=None):
