@@ -14,7 +14,7 @@ def aggregate_peptides(
     input_molecule: str = 'peptide',
     input_column: str = "abundance",
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: Optional[str] = None,
     mapping: str = "protein",
     only_unique: bool = True,
     inplace: bool = False,
@@ -22,6 +22,8 @@ def aggregate_peptides(
 ) -> Optional[Dataset]:
     if not inplace:
         dataset = dataset.copy()
+    if result_column is None:
+        result_column = input_column
     mapped = dataset.molecule_set.get_mapped_pairs(result_molecule, input_molecule, mapping=mapping)
     unique_peptides = []
     if only_unique:
@@ -47,7 +49,7 @@ def aggregate_peptides(
         return dataset
 
 
-def mean(
+def neighbor_mean(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
@@ -75,7 +77,7 @@ def mean(
     )
 
 
-def median(
+def neighbor_median(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
@@ -103,13 +105,13 @@ def median(
     )
 
 
-def sum(
+def neighbor_sum(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
     input_column: str = "abundance",
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: Optional[str] = None,
     mapping: str = "protein",
     inplace: bool = False,
     tqdm_bar: bool = False,
@@ -131,7 +133,7 @@ def sum(
     )
 
 
-def minimum(
+def neighbor_min(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
@@ -159,7 +161,7 @@ def minimum(
     )
 
 
-def maximum(
+def neighbor_max(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
@@ -187,7 +189,7 @@ def maximum(
     )
 
 
-def top_n_mean(
+def neighbor_top_n_mean(
     dataset: Dataset,
     top_n: int = 3,
     only_unique: bool = True,

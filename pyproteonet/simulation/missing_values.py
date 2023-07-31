@@ -12,7 +12,8 @@ def simulate_mnars_thresholding_sample(
     thresh_std: float,
     molecule: str = "peptide",
     column: str = "abundance",
-    write_mask_column: Optional[str] = "mnar_mask",
+    result_column: Optional[str] = None,
+    mask_column: Optional[str] = None,
     in_log_space: bool = False,
     rng: Optional[Generator] = None,
 ):
@@ -24,10 +25,14 @@ def simulate_mnars_thresholding_sample(
     if in_log_space:
         vals = np.log(vals)
     mask = mask & (vals < thresh)
-    sample.values[molecule].loc[mask, column] = sample.missing_abundance_value
-    if write_mask_column is not None:
-        sample.values[molecule].loc[:, write_mask_column] = False
-        sample.values[molecule].loc[mask, write_mask_column] = True
+    if result_column is None:
+        result_column = column
+    else:
+        sample.values[molecule][result_column] = sample.values[molecule][column].copy()
+    sample.values[molecule].loc[mask, result_column] = sample.missing_abundance_value
+    if mask_column is not None:
+        sample.values[molecule].loc[:, mask_column] = False
+        sample.values[molecule].loc[mask, mask_column] = True
     return sample
 
 
@@ -37,7 +42,8 @@ def simulate_mnars_thresholding(
     thresh_std: float,
     molecule: str = "peptide",
     column: str = "abundance",
-    write_mask_column: Optional[str] = "mnar_mask",
+    result_column: Optional[str] = None,
+    mask_column: Optional[str] = None,
     in_log_space: bool = False,
     rng: Optional[Generator] = None,
     inplace: bool = False,
@@ -52,6 +58,8 @@ def simulate_mnars_thresholding(
         thresh_std=thresh_std,
         molecule=molecule,
         column=column,
+        result_column=result_column,
+        mask_column=mask_column,
         in_log_space=in_log_space,
         rng=rng,
     )
@@ -59,40 +67,45 @@ def simulate_mnars_thresholding(
 
 def simulate_mcars_sample(
     sample: DatasetSample,
-    amount_mcars: Union[int, float],
+    amount: Union[int, float],
     molecule: str = "peptide",
     column: str = "abundance",
-    write_mask_column: Optional[str] = "mcar_mask",
+    result_column: Optional[str] = None,
+    mask_column: Optional[str] = None,
     rng: Optional[Generator] = None,
 ):
     if rng is None:
         rng = np.random.default_rng()
     num_vals = sample.values[molecule].shape[0]
-    if isinstance(amount_mcars, float) and amount_mcars <= 1.0:
-        amount_mcars = int(num_vals * amount_mcars)
+    if isinstance(amount, float) and amount <= 1.0:
+        amount = int(num_vals * amount)
     else:
-        amount_mcars = int(amount_mcars)
+        amount = int(amount)
     mask = sample.non_missing_mask(molecule=molecule, column=column)
     num_vals = mask.sum()
-    if amount_mcars > num_vals:
-        raise ValueError(f"Only {num_vals} non missing values are in the sample but {amount_mcars} MCARS were requests!")
-    mcar_mask = rng.choice(np.nonzero(mask)[0], size=amount_mcars, replace=False)
+    if amount > num_vals:
+        raise ValueError(f"Only {num_vals} non missing values are in the sample but {amount} MCARS were requests!")
+    mcar_mask = rng.choice(np.nonzero(mask)[0], size=amount, replace=False)
     mask[:] = False
     mask[mcar_mask] = True
-    #import pdb; pdb.set_trace()
-    sample.values[molecule].loc[mask, column] = sample.missing_abundance_value
-    if write_mask_column is not None:
-        sample.values[molecule].loc[:, write_mask_column] = False
-        sample.values[molecule].loc[mask, write_mask_column] = True
+    if result_column is None:
+        result_column = column
+    else:
+        sample.values[molecule][result_column] = sample.values[molecule][column].copy()
+    sample.values[molecule].loc[mask, result_column] = sample.missing_abundance_value
+    if mask_column is not None:
+        sample.values[molecule].loc[:, mask_column] = False
+        sample.values[molecule].loc[mask, mask_column] = True
     return sample
 
 
 def simulate_mcars(
     dataset: Dataset,
-    amount_mcars: Union[int, float],
+    amount: Union[int, float],
     molecule: str = "peptide",
     column: str = "abundance",
-    write_mask_column: Optional[str] = "mcar_mask",
+    result_column: Optional[str] = None,
+    mask_column: Optional[str] = None,
     rng: Optional[Generator] = None,
     inplace: bool = False,
 ):
@@ -102,10 +115,11 @@ def simulate_mcars(
         dataset = dataset.copy()
     return dataset.apply(
         simulate_mcars_sample,
-        amount_mcars=amount_mcars,
+        amount=amount,
         molecule=molecule,
         column=column,
-        write_mask_column=write_mask_column,
+        result_column=result_column,
+        mask_column=mask_column,
         rng=rng,
     )
 

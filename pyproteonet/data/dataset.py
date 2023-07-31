@@ -84,6 +84,8 @@ class Dataset:
         for mol, mol_df in self.molecules.items():
             if mol not in values:
                 values[mol] = pd.DataFrame(index=mol_df.index)
+            else:
+                values[mol] = pd.DataFrame(data=values[mol], index=mol_df.index)
         self.samples_dict[name] = DatasetSample(dataset=self, values=values)
 
     @property
@@ -111,6 +113,9 @@ class Dataset:
     
     def __len__(self) -> int:
         return len(self.samples_dict)
+    
+    def __iter__(self) -> Iterable:
+        return self.samples
 
     def apply(self, fn: Callable, *args, **kwargs):
         transformed = {}
@@ -147,8 +152,9 @@ class Dataset:
             res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, column]
         return res
     
-    def flatten_values(self, molecule: str, column: str = 'abundance', drop_sample: bool = True):
+    def flatten_column(self, molecule: str, column: str = 'abundance', drop_sample: bool = False):
         vals = self.get_samples_value_matrix(molecule, column).stack(dropna=False)
+        vals.index.set_names(['id', 'sample'], inplace=True)
         if drop_sample:
             vals.reset_index(level=1, drop=True, inplace=True)
         return vals

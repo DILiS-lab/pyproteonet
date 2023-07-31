@@ -65,6 +65,7 @@ def logarithmize(
     data: Union[DatasetSample, "Dataset"],
     molecules: Optional[Iterable[str]] = None,
     columns: Optional[Iterable[str]] = None,
+    epsilon: float = 0.0,
 ):
     return apply(data, _logarithmize, molecules=molecules, columns=columns)
 
