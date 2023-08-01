@@ -15,8 +15,8 @@ def add_positive_gaussian(
     molecule: str = "protein",
     column: str = "abundance",
     result_column: Optional[str] = None,
-    mean: float = 0,
-    std: float = 1,
+    mu: float = 0,
+    sigma: float = 1,
     inplace: bool = False,
     random_seed: Optional[int] = None,
 ) -> Dataset:
@@ -43,7 +43,7 @@ def add_positive_gaussian(
     rng = np.random.default_rng(seed=random_seed)
     for sample in dataset.samples:
         vals = sample.values[molecule].loc[:, column]
-        error = rng.normal(loc=mean, scale=std, size=len(vals))
+        error = rng.normal(loc=mu, scale=sigma, size=len(vals))
         sample.values[molecule][result_column] = vals + np.abs(error)
     return dataset
 
@@ -53,7 +53,7 @@ def multiply_exponential_gaussian(
     molecule: str = "protein",
     column: str = "abundance",
     result_column: Optional[str] = None,
-    std: float = 0.33,
+    sigma: float = 0.33,
     inplace: bool = False,
     random_seed: Optional[int] = None,
 ) -> Dataset:
@@ -78,7 +78,7 @@ def multiply_exponential_gaussian(
     rng = np.random.default_rng(seed=random_seed)
     for sample in dataset.samples:
         vals = sample.values[molecule].loc[:, column]
-        error = rng.normal(loc=0, scale=std, size=len(vals))
+        error = rng.normal(loc=0, scale=sigma, size=len(vals))
         vals = vals * np.exp(error)
         sample.values[molecule][result_column] = vals
     return dataset
@@ -89,7 +89,7 @@ def add_std_correlated_gaussian(
     molecule: str = "protein",
     column: str = "abundance",
     result_column: Optional[str] = None,
-    std_factor: float = 0.33,
+    sigma_factor: float = 0.33,
     clip: bool = True,
     inplace: bool = False,
     random_seed: Optional[int] = None,
@@ -118,7 +118,7 @@ def add_std_correlated_gaussian(
 
     for sample in dataset.samples:
         vals = sample.values[molecule].loc[:, column]
-        error = rng.normal(loc=0, scale=std_factor * vals, size=len(vals))
+        error = rng.normal(loc=0, scale=sigma_factor * vals, size=len(vals))
         vals = vals + error
         if clip:
             vals = np.clip(vals, a_min=0, a_max=None)
@@ -144,3 +144,4 @@ def poisson_error(
         mask = ~mask
         vals = vals[mask]
         sample.values[molecule].loc[mask, result_column] = rng.poisson(lam=vals)
+    return dataset

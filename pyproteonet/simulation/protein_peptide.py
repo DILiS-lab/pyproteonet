@@ -2,22 +2,22 @@ from typing import List, Union, Optional
 
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
-from .value_creation import draw_normal_log_space
+from .sampling import draw_normal_log_space
 from .modification import per_molecule_random_scaling, introduce_random_condition
 from .random_error import multiply_exponential_gaussian, add_positive_gaussian, poisson_error
 from ..processing.aggregation import neighbor_sum
 
 
-def simulate_protein_based_log_space(
+def simulate_protein_peptide_dataset(
     molecule_set: MoleculeSet,
     num_samples: int = 10,
-    log_abundance_mean: float = 10,
-    log_abundance_std: float = 2,
+    log_abundance_mu: float = 10,
+    log_abundance_sigma: float = 2,
     log_protein_error_std: float = 0.3,
     simulate_flyability: bool = True,
     flyability_alpha: float = 5,
     flyability_beta: float = 2.5,
-    peptide_noise_std: float = 100,
+    peptide_noise_sigma: float = 100,
     peptide_poisson_error: bool = True,
     condition_affected_samples: List[float]=0.0,
     fraction_affected_by_condition: List[float]=[],
@@ -30,8 +30,8 @@ def simulate_protein_based_log_space(
 ) -> Dataset:
     dataset = draw_normal_log_space(
         molecule_set=molecule_set,
-        log_abundance_mean=log_abundance_mean,
-        log_abundance_std=log_abundance_std,
+        log_mu=log_abundance_mu,
+        log_sigma=log_abundance_sigma,
         num_samples=num_samples,
         molecule="protein",
         column=protein_column,
@@ -54,7 +54,7 @@ def simulate_protein_based_log_space(
         dataset,
         molecule="protein",
         column=protein_column,
-        std=log_protein_error_std,
+        sigma=log_protein_error_std,
         inplace=True,
         random_seed=random_seed,
     )
@@ -82,8 +82,8 @@ def simulate_protein_based_log_space(
         dataset,
         molecule="peptide",
         column=peptide_column,
-        mean=0,
-        std=peptide_noise_std,
+        mu=0,
+        sigma=peptide_noise_sigma,
         inplace=True,
         random_seed=random_seed,
     )

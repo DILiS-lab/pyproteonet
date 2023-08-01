@@ -38,8 +38,8 @@ def simulate_mnars_thresholding_sample(
 
 def simulate_mnars_thresholding(
     dataset: Dataset,
-    thresh_mean: float,
-    thresh_std: float,
+    thresh_mu: float,
+    thresh_sigma: float,
     molecule: str = "peptide",
     column: str = "abundance",
     result_column: Optional[str] = None,
@@ -54,8 +54,8 @@ def simulate_mnars_thresholding(
         dataset = dataset.copy()
     return dataset.apply(
         fn=simulate_mnars_thresholding_sample,
-        thresh_mean=thresh_mean,
-        thresh_std=thresh_std,
+        thresh_mean=thresh_mu,
+        thresh_std=thresh_sigma,
         molecule=molecule,
         column=column,
         result_column=result_column,

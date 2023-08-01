@@ -19,16 +19,25 @@ from ..processing.dataset_transforms import rename_values, drop_values
 
 
 class Dataset:
+    """Representing a dataset consisting of a MoleculeSet specifying molecules and relations
+        and several DatasetSamples each holding a set of values for every molecule.
+    """    
     def __init__(
         self,
         molecule_set: MoleculeSet,
         samples: Dict[str, DatasetSample] = {},
         missing_value: float = np.nan,
-        missing_label_value: float = -100,
     ):
+        """Generates a dataset based on a MoleculeSet and an optional list of DatasetSamples.
+
+        Args:
+            molecule_set (MoleculeSet): The MoleculeSet this dataset is based on
+            samples (Dict[str, DatasetSample], optional): Dictionary of DatasetSamples containing samples for this dataset. Defaults to {}.
+            missing_value (float, optional): Value used to represent missing values. Defaults to np.nan.
+        """        
         self.molecule_set = molecule_set
         self.missing_value = missing_value
-        self.missing_label_value = (missing_label_value,)
+        self.missing_label_value = np.nan
         self.samples_dict = OrderedDict(samples)
         for sample in self.samples_dict.values():
             sample.dataset = self
