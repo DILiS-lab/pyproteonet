@@ -154,6 +154,18 @@ class Dataset:
             return values, np.concatenate(mask)
         return values
     
+    def get_values_flat(self, molecule: str):
+        sample_names, df = [], []
+        for name, sample in self.samples_dict.items():
+            values = sample.values[molecule]
+            sample_names.extend(np.full(len(values), name))
+            df.append(values)
+        df = pd.concat(df)
+        index = pd.DataFrame({'sample':sample_names, 'id':df.index})
+        index = pd.MultiIndex.from_frame(index)
+        df.set_index(index, inplace=True)
+        return df
+            
     def get_samples_value_matrix(self, molecule: str, column: str = 'abundance'):
         res = pd.DataFrame(data=[], index=self.molecule_set.molecules[molecule].index)
         for name in self.sample_names:

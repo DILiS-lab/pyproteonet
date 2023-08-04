@@ -20,5 +20,6 @@ dependencies = [
     "seaborn",
     "lightning",
     "tables",
-    "pyopenms"
+    "pyopenms",
+    "alphapept",
 ]

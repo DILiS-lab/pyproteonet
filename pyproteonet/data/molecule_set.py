@@ -25,7 +25,8 @@ class MoleculeSet:
         Args:
             molecules (Dict[str, pd.DataFrame]): Relevant molecules as dictionay of molecule name and dataframe containing at least the molecule indices
             mappings (Dict[str, Dict[str, pd.DataFrame]]): Dictionary of molecules mappings.
-                Every mapping is a dictionary of molecule name and mapping as dataframe containing mapping id and molecule index pairs
+                Every mapping is a dictionary of molecule name and mapping
+                where mapping is a dataframe containing "map_id" and "id" (molecule id) columns
         """
         self.molecules = molecules
         self.mappings = mappings

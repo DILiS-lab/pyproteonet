@@ -1,3 +1,4 @@
+import numpy as np
 
 from ..data.dataset import Dataset
 from ..processing.molecule_set_transforms import num_theoretical_peptides
