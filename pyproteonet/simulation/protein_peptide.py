@@ -61,7 +61,7 @@ def simulate_protein_peptide_dataset(
     neighbor_sum(
         dataset,
         input_molecule="protein",
-        input_column=protein_column,
+        column=protein_column,
         mapping=mapping,
         result_molecule="peptide",
         result_column=peptide_column,

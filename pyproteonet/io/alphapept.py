@@ -8,7 +8,7 @@ import h5py
 from ..data import MoleculeSet, Dataset
 
 
-def read_alphapept(
+def load_alphapept_result(
     base_path: Union[str, Path],
     peptide_id_field: str="sequence",
     summed_peptide_fields: List[str]=["ms1_int_sum_apex"],
@@ -60,11 +60,10 @@ def read_alphapept(
     assert protein_to_group_mapping.index.is_unique
 
     per_sample_fields = set(per_sample_fields)
-    groups = protein_fdr.groupby([peptide_id_field])
+    groups = protein_fdr.groupby(peptide_id_field)
     peptides = groups[[f for f in summed_peptide_fields if f not in per_sample_fields]].sum()
     mean_fields = [f for f in averaged_peptide_fields if f not in per_sample_fields]
     peptides[mean_fields] = groups[mean_fields].mean()
-    protein_groups_df = pd.DataFrame(index=protein_groups)
     if keep_razor_mapping:
         assert (groups["protein_group"].nunique() == 1).all()
         peptides["protein_group"] = groups["protein_group"].first()
@@ -77,7 +76,7 @@ def read_alphapept(
         pep_mapping = mapping_sequences.merge(pep_mapping, on="id", how="inner")
         del pep_mapping["id"]
         pep_mapping.rename(columns={peptide_id_field: "id"}, inplace=True)
-    # pep_mapping = pep_mapping[pep_mapping.id.isin(peptides.index)]
+    pep_mapping = pep_mapping[pep_mapping.id.isin(peptides.index)]
     pep_mapping.loc[:, "map_id"] = protein_to_group_mapping.loc[pep_mapping.map_id].values
 
     sample_groups = protein_fdr.groupby(["sample_group", peptide_id_field])

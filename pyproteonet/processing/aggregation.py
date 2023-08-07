@@ -12,7 +12,7 @@ def aggregate_peptides(
     dataset: Dataset,
     aggregation_fn: Callable[[SeriesGroupBy], pd.Series],
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = "abundance",
     result_molecule: str = 'protein',
     result_column: Optional[str] = None,
     mapping: str = "protein",
@@ -23,7 +23,7 @@ def aggregate_peptides(
     if not inplace:
         dataset = dataset.copy()
     if result_column is None:
-        result_column = input_column
+        result_column = column
     mapped = dataset.molecule_set.get_mapped_pairs(result_molecule, input_molecule, mapping=mapping)
     unique_peptides = []
     if only_unique:
@@ -32,10 +32,10 @@ def aggregate_peptides(
     for sample in tqdm(dataset.samples) if tqdm_bar else dataset.samples:
         sample_mapping = mapped.copy()
         sample_mapping["val"] = (
-            sample.values[input_molecule].loc[sample_mapping[input_molecule], input_column].to_numpy()
+            sample.values[input_molecule].loc[sample_mapping[input_molecule], column].to_numpy()
         )
         sample_mapping["missing"] = (
-            sample.missing_mask(molecule=input_molecule, column=input_column).loc[sample_mapping[input_molecule]].to_numpy()
+            sample.missing_mask(molecule=input_molecule, column=column).loc[sample_mapping[input_molecule]].to_numpy()
         )
         sample_mapping = sample_mapping[~sample_mapping["missing"]]
         # sample_mapping.sort_values('val', inplace=True, ascending=False)
@@ -53,9 +53,9 @@ def neighbor_mean(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = 'abundance',
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: str = None,
     mapping: str = "protein",
     inplace: bool = False,
     tqdm_bar: bool = False,
@@ -68,7 +68,7 @@ def neighbor_mean(
         aggregation_fn=_mean,
         only_unique=only_unique,
         input_molecule=input_molecule,
-        input_column=input_column,
+        column=column,
         result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
@@ -81,9 +81,9 @@ def neighbor_median(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = 'abundance',
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: str = None,
     mapping: str = "protein",
     inplace: bool = False,
     tqdm_bar: bool = False,
@@ -96,7 +96,7 @@ def neighbor_median(
         aggregation_fn=_median,
         only_unique=only_unique,
         input_molecule=input_molecule,
-        input_column=input_column,
+        column=column,
         result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
@@ -109,7 +109,7 @@ def neighbor_sum(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = "abundance",
     result_molecule: str = 'protein',
     result_column: Optional[str] = None,
     mapping: str = "protein",
@@ -124,7 +124,7 @@ def neighbor_sum(
         aggregation_fn=_sum,
         only_unique=only_unique,
         input_molecule=input_molecule,
-        input_column=input_column,
+        column=column,
         result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
@@ -137,9 +137,9 @@ def neighbor_min(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = "abundance",
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: str = None,
     mapping: str = "protein",
     inplace: bool = False,
     tqdm_bar: bool = False,
@@ -152,7 +152,7 @@ def neighbor_min(
         aggregation_fn=_min,
         only_unique=only_unique,
         input_molecule=input_molecule,
-        input_column=input_column,
+        column=column,
         result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
@@ -165,9 +165,9 @@ def neighbor_max(
     dataset: Dataset,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = "abundance",
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: str = None,
     mapping: str = "protein",
     inplace: bool = False,
     tqdm_bar: bool = False,
@@ -180,7 +180,7 @@ def neighbor_max(
         aggregation_fn=_max,
         only_unique=only_unique,
         input_molecule=input_molecule,
-        input_column=input_column,
+        column=column,
         result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,
@@ -194,22 +194,22 @@ def neighbor_top_n_mean(
     top_n: int = 3,
     only_unique: bool = True,
     input_molecule: str = 'peptide',
-    input_column: str = "abundance",
+    column: str = "abundance",
     result_molecule: str = 'protein',
-    result_column: str = "abundance",
+    result_column: str = None,
     mapping: str = "protein",
     inplace: bool = False,
     tqdm_bar: bool = False,
 ):
     def _top_n_mean(groups: SeriesGroupBy) -> pd.Series:
-        return groups.nlargest(top_n).groupby("protein").mean()[groups.count() >= top_n]
+        return groups.nlargest(top_n).groupby(result_molecule).mean()[groups.count() >= top_n]
 
     return aggregate_peptides(
         dataset=dataset,
         aggregation_fn=_top_n_mean,
         only_unique=only_unique,
         input_molecule=input_molecule,
-        input_column=input_column,
+        column=column,
         result_molecule=result_molecule,
         result_column=result_column,
         mapping=mapping,

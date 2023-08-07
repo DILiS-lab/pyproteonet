@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 
 #from ..utils import load_external_data
-from .dataset_sample import DatasetSample
-from .dataset import Dataset
-from .molecule_set import MoleculeSet
+from ..data.dataset_sample import DatasetSample
+from ..data.dataset import Dataset
+from ..data.molecule_set import MoleculeSet
 
 
 def _de_duplicate(df: pd.DataFrame, ids: np.ndarray):
