@@ -3,18 +3,18 @@ from typing import Union, Dict, Callable, Optional, List, TYPE_CHECKING, Iterabl
 import numpy as np
 import pandas as pd
 
-from ..data.dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
 
 if TYPE_CHECKING:
     from ..data.dataset import Dataset
+    from ..data.dataset_sample import DatasetSample
 
 
-def apply(data: Union[DatasetSample, "Dataset"], dataset_fn: Callable, *args, **kwargs):
+def apply(data: Union["DatasetSample", "Dataset"], dataset_fn: Callable, *args, **kwargs):
     return data.apply(dataset_fn, *args, **kwargs)
 
 
-def _normalize(ds: DatasetSample, molecules: Optional[Iterable[str]] = None, columns: Optional[List[str]] = None):
+def _normalize(ds: "DatasetSample", molecules: Optional[Iterable[str]] = None, columns: Optional[List[str]] = None):
     ds = ds.copy()
     if molecules is None:
         molecules = ds.values.keys()
@@ -29,7 +29,7 @@ def _normalize(ds: DatasetSample, molecules: Optional[Iterable[str]] = None, col
 
 
 def normalize(
-    data: Union[DatasetSample, "Dataset"],
+    data: Union["DatasetSample", "Dataset"],
     molecules: Optional[Iterable[str]] = None,
     columns: Optional[Iterable[str]] = None,
 ):
@@ -37,7 +37,7 @@ def normalize(
 
 
 def _logarithmize(
-    ds: DatasetSample,
+    ds: "DatasetSample",
     molecules: Optional[Iterable[str]] = None,
     columns: Optional[Iterable[str]] = None,
     epsilon: float = 0.0,
@@ -62,7 +62,7 @@ def _logarithmize(
 
 
 def logarithmize(
-    data: Union[DatasetSample, "Dataset"],
+    data: Union["DatasetSample", "Dataset"],
     molecules: Optional[Iterable[str]] = None,
     columns: Optional[Iterable[str]] = None,
     epsilon: float = 0.0,
@@ -71,7 +71,7 @@ def logarithmize(
 
 
 def _rename_values(
-    sample: DatasetSample, columns: Dict[str, str], molecules: Optional[Iterable[str]] = None, inplace: bool = False
+    sample: "DatasetSample", columns: Dict[str, str], molecules: Optional[Iterable[str]] = None, inplace: bool = False
 ):
     if not inplace:
         sample = sample.copy()
@@ -83,7 +83,7 @@ def _rename_values(
 
 
 def rename_values(
-    data: Union[DatasetSample, "Dataset"],
+    data: Union["DatasetSample", "Dataset"],
     columns: Dict[str, str],
     molecules: Optional[Iterable[str]] = None,
     inplace: bool = False,
@@ -94,7 +94,7 @@ def rename_values(
 
 
 def _drop_values(
-    sample: DatasetSample, columns: List[str], molecules: Optional[Iterable[str]] = None, inplace: bool = False
+    sample: "DatasetSample", columns: List[str], molecules: Optional[Iterable[str]] = None, inplace: bool = False
 ):
     if not inplace:
         sample = sample.copy()
@@ -106,7 +106,7 @@ def _drop_values(
 
 
 def drop_values(
-    data: Union[DatasetSample, "Dataset"],
+    data: Union["DatasetSample", "Dataset"],
     columns: Iterable[str],
     molecules: Optional[Iterable[str]] = None,
     inplace: bool = False,

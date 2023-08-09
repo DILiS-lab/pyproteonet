@@ -6,7 +6,7 @@ import torch
 import psutil
 import torch.nn.functional as F
 
-from .graph_data_set import GraphDataSet
+from .masked_dataset_adapter import GraphDataSet
 
 
 def train_node_regression(model: torch.nn.Module, train_data_set: GraphDataSet, test_data_set: Optional[GraphDataSet] = None,

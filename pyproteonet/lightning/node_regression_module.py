@@ -9,8 +9,9 @@ import numpy as np
 from tqdm.auto import tqdm
 from dgl.dataloading import GraphDataLoader
 
-from ..data.masked_dataset import MaskedDataset
-from ..dgl.graph_data_set import GraphDataSet
+from ..data.abstract_masked_dataset import AbstractMaskedDataset
+from ..dgl.masked_dataset_adapter import MaskedDatasetAdapter
+from ..dgl.graph_key_dataset import GraphKeyDataset
 
 
 class NodeRegressionModule(pl.LightningModule):
@@ -110,9 +111,10 @@ class NodeRegressionModule(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         return self(batch)
 
+    #TODO: Deprectated, remove!
     def predict_masked_dataset(
         self,
-        masked_dataset: MaskedDataset,
+        masked_dataset: AbstractMaskedDataset,
         mapping: str = "gene",
         value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
         molecule_columns: List[str] = [],
@@ -122,10 +124,10 @@ class NodeRegressionModule(pl.LightningModule):
     ):
         # graph = sample.molecule_set.create_graph(mapping=mapping).to_dgl()
         # sample.populate_graph_dgl(graph, value_columns=value_columns, mapping=mapping)
-        graph_ds = GraphDataSet(masked_datasets=[masked_dataset], mapping=mapping, value_columns=value_columns, 
-                                molecule_columns=molecule_columns, target_column=target_column, bidirectional_graph=bidirectional_graph)
+        graph_ds = GraphKeyDataset(masked_dataset=masked_dataset, mapping=mapping, value_columns=value_columns, 
+                                   molecule_columns=molecule_columns, target_column=target_column, bidirectional_graph=bidirectional_graph)
         #we only have one dataset/graph so we only need to compute the node mapping once
-        graph = graph_ds.index_to_molecule_graph(0)
+        graph = graph_ds.graph
         dl = GraphDataLoader(graph_ds, batch_size=1)
         with torch.no_grad():
             trainer = Trainer()

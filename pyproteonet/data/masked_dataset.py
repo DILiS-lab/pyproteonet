@@ -5,10 +5,11 @@ import pandas as pd
 from .dataset import Dataset
 from .dataset_sample import DatasetSample
 from .molecule_graph import MoleculeGraph
-from ..dgl.graph_data_set import GraphDataSet
+from .abstract_masked_dataset import AbstractMaskedDataset
+from ..dgl.graph_key_dataset import GraphKeyDataset
 
 
-class MaskedDataset:
+class MaskedDataset(AbstractMaskedDataset):
     def __init__(
         self, dataset: Dataset, mask: pd.DataFrame, hidden: Optional[pd.DataFrame] = None, molecule: str = "protein"
     ) -> None:
@@ -20,6 +21,7 @@ class MaskedDataset:
     def keys(self) -> Iterable[str]:
         return self.mask.keys()
 
+    @property
     def has_hidden(self) -> bool:
         if self.hidden is not None:
             return True
@@ -49,7 +51,13 @@ class MaskedDataset:
         value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
         molecule_columns: List[str] = [],
         target_column: str = "abundance",
-    ):
-        return GraphDataSet(
-            masked_datasets=[self], mapping=mapping, value_columns=value_columns, molecule_columns=molecule_columns, target_column=target_column
+        missing_column_value: Optional[float] = None
+    ) -> GraphKeyDataset:
+        return GraphKeyDataset(
+            masked_dataset=self,
+            mapping=mapping,
+            value_columns=value_columns,
+            molecule_columns=molecule_columns,
+            target_column=target_column,
+            missing_column_value=missing_column_value
         )

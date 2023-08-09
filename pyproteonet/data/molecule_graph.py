@@ -7,7 +7,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as snb
 
-from .graph_creation import create_graph_dgl, populate_graph_dgl, NODE_TYPE_INVERSE_MAPPING
 if TYPE_CHECKING:
     from .molecule_set import MoleculeSet
 
@@ -24,6 +23,7 @@ class MoleculeGraph:
         self.inverse_type_mapping =  {v:k for k,v in type_mapping.items()}
 
     def to_dgl(self):
+        from ..dgl.graph_creation import create_graph_dgl
         return create_graph_dgl(nodes=self.nodes, edges=self.edges)
 
     def get_node_degrees(self, molecule_type:str, outgoing:bool=True, incoming:bool=False)->pd.Series:

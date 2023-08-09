@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 from pandas import HDFStore
 
-from .graph_creation import populate_graph_dgl
+from ..dgl.graph_creation import populate_graph_dgl
 from .molecule_set import MoleculeSet
 from .molecule_graph import MoleculeGraph
 from ..utils.numpy import eq_nan
@@ -117,7 +117,8 @@ class DatasetSample:
         mapping: str = "gene",
         value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
         molecule_columns: List[str] = [],
-        target_column: str = 'abundance'
+        target_column: str = 'abundance',
+        missing_column_value: Optional[float] = None,
     ):
         populate_graph_dgl(
             graph=self.molecule_set.create_graph(mapping=mapping, bidirectional=True),
@@ -125,7 +126,8 @@ class DatasetSample:
             dataset_sample=self,
             value_columns=value_columns,
             molecule_columns=molecule_columns,
-            target_column=target_column
+            target_column=target_column,
+            missing_column_value=missing_column_value
         )
 
     def get_values(self, molecule: str, column: str = 'abundance', return_missing_mask: bool = False):

@@ -6,18 +6,78 @@ import pandas as pd
 import numpy as np
 
 from ..data.dataset import Dataset
+from ..data.dataset_sample import DatasetSample
 from ..data.masked_dataset import MaskedDataset
+from ..data.masked_dataset_iterable import MaskedDatasetIterable
+from ..data.masks import DatasetSampleMask
 
-def molecule_mask(dataset: Dataset, molecules_to_mask: Union[pd.Index, List, np.ndarray], molecule: str = 'protein'):
+
+def molecule_mask(
+    dataset: Dataset, mask: Union[pd.Index, List, np.ndarray], molecule: str = "protein"
+) -> MaskedDataset:
     mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
     for sample_name, sample in dataset.samples_dict.items():
         mask[sample_name] = False
-        mask.loc[molecules_to_mask, sample_name] = True
-    return MaskedDataset(dataset=dataset, mask=mask)
+        mask.loc[mask, sample_name] = True
+    return MaskedDataset(dataset=dataset, mask=mask, molecule=molecule)
+
+def missing_mask(
+    dataset: Dataset, molecule: str = "protein", column: str = 'abundance',
+) -> MaskedDataset:
+    mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
+    for sample_name, sample in dataset.samples_dict.items():
+        mask[sample_name] = False
+        mask.loc[sample.missing_mask(molecule=molecule, column=column), sample_name] = True
+    return MaskedDataset(dataset=dataset, mask=mask, molecule=molecule)
+
+def train_test_non_missing_no_overlap_iterable(
+    dataset: Dataset,
+    train_frac: float = 0.1,
+    test_frac: float = 0.1,
+    molecule: str = "protein",
+    column: str = "abundance",
+    random_seed: Optional[int] = None,
+) -> Tuple[MaskedDatasetIterable, MaskedDatasetIterable]:
+    """Generates and iterable dataset with random, non-missing train molecules and a fixed set of test molecules.
+
+    A fixed set of test molecules is sampled once for the dataset. For every sample the subset of those test molecues
+    that has non-missing values is used as test set. From the remaining non-missing molecules within the sample a 
+    fraction of size train_frac is samples as train set. Returned datasets are iterable datasets (training molecules
+    are not fixed by drawn randomly every time a training sample is requested).
+
+    Args:
+        dataset (Dataset): _description_
+        train_frac (float, optional): Train set size relative to number of non-missing values within a sample. Defaults to 0.1.
+        test_frac (float, optional): Test set size relative to number of molecules. Defaults to 0.1.
+        molecule (str, optional): Molecule type to use. Defaults to "protein".
+        column (str, optional): Value column to use. Defaults to "abundance".
+        random_seed (Optional[int], optional): Random state for random draws of train/test sets. Defaults to None.
+
+    Returns:
+        Tuple[MaskedDatasetIterable, MaskedDatasetIterable]: Tuple of train and test iterable datasets.
+    """    
+    assert train_frac + test_frac <= 1.0
+    test_molecules = dataset.molecule_set.molecules[molecule].sample(frac=test_frac, random_state=random_seed).index
+
+    def sample_train(sample: DatasetSample):
+        vals: pd.Series = sample.values[molecule][column][sample.non_missing_mask(molecule=molecule, column=column)]
+        vals = vals[~vals.index.isin(test_molecules)]
+        train_molecules = vals.sample(frac=train_frac, random_state=random_seed).index
+        return DatasetSampleMask(sample=sample, molecule=molecule, masked=train_molecules, hidden=test_molecules)
+
+    def sample_test(sample: DatasetSample):
+        vals: pd.Series = sample.values[molecule][column][sample.non_missing_mask(molecule=molecule, column=column)]
+        vals = vals[vals.index.isin(test_molecules)]
+        return DatasetSampleMask(sample=sample, molecule=molecule, masked=vals.index)
+
+    train_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_train, molecule=molecule, has_hidden=True)
+    test_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_test, molecule=molecule, has_hidden=False)
+    return train_ds, test_ds
+
 
 def train_test_full(
     dataset: Dataset, train_size: float = 0.8, molecule: str = "protein", random_state: Optional[int] = None
-)->Tuple[MaskedDataset, MaskedDataset]:
+) -> Tuple[MaskedDataset, MaskedDataset]:
     splitter = ShuffleSplit(n_splits=1, train_size=train_size, random_state=random_state)
     ms = dataset.molecule_set
     train_molecules, test_molecules = next(splitter.split(ms.molecules[molecule]))
@@ -34,9 +94,14 @@ def train_test_full(
     test_ds = MaskedDataset(dataset=dataset, mask=test_masks, hidden=train_masks)
     return train_ds, test_ds
 
+
 def train_test_non_missing_no_sample_overlap(
-    dataset: Dataset, train_molecules_size: float = 0.8, molecule: str = "protein", column: str = 'abundance', random_state: Optional[int] = None
-)->Tuple[MaskedDataset, MaskedDataset]:
+    dataset: Dataset,
+    train_molecules_size: float = 0.8,
+    molecule: str = "protein",
+    column: str = "abundance",
+    random_state: Optional[int] = None,
+) -> Tuple[MaskedDataset, MaskedDataset]:
     splitter = ShuffleSplit(n_splits=1, train_size=train_molecules_size, random_state=random_state)
     ms = dataset.molecule_set
     train_molecules, test_molecules = next(splitter.split(ms.molecules[molecule]))
@@ -55,7 +120,6 @@ def train_test_non_missing_no_sample_overlap(
     train_ds = MaskedDataset(dataset=dataset, mask=train_masks, hidden=test_masks)
     test_ds = MaskedDataset(dataset=dataset, mask=test_masks, hidden=train_masks)
     return train_ds, test_ds
-
 
 
 # def create_protein_masks_stratified_fold(data_set: 'DatasetSample', shuffle: bool = True,
@@ -80,7 +144,7 @@ def train_test_non_missing_no_sample_overlap(
 #         test_node_folds.append(data_set.molecule_set.node_mapping['protein'].loc[test_split].node_id.to_numpy())
 #     return train_node_folds, test_node_folds
 
-# def create_protein_masks_stratified_fold_legacy(data_set: 'DatasetSample', missing_label = -100.0, 
+# def create_protein_masks_stratified_fold_legacy(data_set: 'DatasetSample', missing_label = -100.0,
 #                                          validation_fraction: float = 0.1, shuffle: bool = True, num_folds: int = 10):
 #     node_values = data_set.get_node_values()
 #     protein_nodes = node_values[node_values['type'] == NODE_TYPE_MAPPING['protein']]
@@ -99,7 +163,7 @@ def train_test_non_missing_no_sample_overlap(
 #         train_node_folds.append(train_test_protein_nodes[train_split])
 #         test_node_folds.append(train_test_protein_nodes[test_split])
 #     return train_node_folds, test_node_folds, validation_protein_nodes
-#     #validation_protein_nodes = 
+#     #validation_protein_nodes =
 #     #missing_label_nodes = node_values[node_values['label'] == missing_label].index
 
 #     if validation_proportion > 0:

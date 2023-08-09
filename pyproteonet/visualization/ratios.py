@@ -7,7 +7,7 @@ import pandas as pd
 from ..data.dataset import Dataset
 
 
-def ratio_volcano_plot(
+def plot_ratios_volcano(
     dataset: Dataset,
     molecule: str,
     column: str,
@@ -19,7 +19,9 @@ def ratio_volcano_plot(
     log_base: int = 10,
     ratio_log_base: int = 2,
     ax: Optional[plt.Axes] = None,
-):
+    scatter_color = None,
+    plot_missing: bool = True
+    ):
     values = dataset.get_samples_value_matrix(molecule=molecule, column=column, samples=samples_a + samples_b)
     overall_missing = values.to_numpy().flatten()
     overall_missing = np.isnan(overall_missing).sum() / overall_missing.shape[0]
@@ -49,13 +51,14 @@ def ratio_volcano_plot(
         mean_abundances = np.log2(mean_abundances) / np.log2(log_base)
     if ratio_log_base is not None:
         ratio = np.log2(ratio) / np.log2(ratio_log_base)
-    ax.scatter(ratio, mean_abundances)
+    ax.scatter(ratio, mean_abundances, color=scatter_color)
     ratio_mean = ratio.mean()
     ratio_existing_abundance = mean_abundances[~ratio.isna()]
-    ax.plot([ratio_mean, ratio_mean], [ratio_existing_abundance.min(), ratio_existing_abundance.max()])
-    missing_text = f"{round(averaged_missing*100,2)}% ratios missing \n({round(overall_missing*100,2)}% of all values missing)"
-    ax.annotate(missing_text, xy=(0, 1), xytext=(12, -12), va='top',
-                xycoords='axes fraction', textcoords='offset points', color='red')
+    ax.plot([ratio_mean, ratio_mean], [ratio_existing_abundance.min(), ratio_existing_abundance.max()], color=scatter_color)
+    if plot_missing:
+        missing_text = f"{round(averaged_missing*100,2)}% ratios missing \n({round(overall_missing*100,2)}% of all values missing)"
+        ax.annotate(missing_text, xy=(0, 1), xytext=(12, -12), va='top',
+                    xycoords='axes fraction', textcoords='offset points', color='red')
     ax.text(
         ratio_mean,
         ratio_existing_abundance.max(),
@@ -64,5 +67,5 @@ def ratio_volcano_plot(
         verticalalignment="bottom",
         size=11,
     )
-    ax.set_xlabel(f'Ratio (log{ratio_log_base if ratio_log_base is not None else ""})')
-    ax.set_ylabel(f'Mean Abundance (log{log_base if log_base is not None else ""})')
+    ax.set_xlabel('Ratio' + f" (log{str(ratio_log_base)})" if ratio_log_base is not None else "")
+    ax.set_ylabel('Mean Abundance'+ f" (log{str(log_base)})" if log_base is not None else "")

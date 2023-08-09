@@ -17,6 +17,17 @@ from .dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
 from ..processing.dataset_transforms import rename_values, drop_values
 
+class DatasetMoleculeValues:
+    def __init__(self, dataset: 'Dataset', molecule: str):
+        self.dataset = dataset
+        self.molecule = molecule
+
+    def __getitem__(self, key):
+        return self.dataset.get_column_flat(molecule=self.molecule, column=key)
+    
+    def __setitem__(self, key, values):
+        self.dataset.set_column_flat(molecule=self.molecule, values=values, column=key)
+
 
 class Dataset:
     """Representing a dataset consisting of a MoleculeSet specifying molecules and relations
@@ -42,6 +53,7 @@ class Dataset:
         self.samples_dict = OrderedDict(samples)
         for sample in self.samples_dict.values():
             sample.dataset = self
+        self.values = {molecule: DatasetMoleculeValues(self, molecule) for molecule in self.molecules.keys()}
 
     @classmethod
     def load(cls, dir_path: Union[str, Path]):
