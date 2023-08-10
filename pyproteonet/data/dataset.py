@@ -28,6 +28,10 @@ class DatasetMoleculeValues:
     def __setitem__(self, key, values):
         self.dataset.set_column_flat(molecule=self.molecule, values=values, column=key)
 
+    @property
+    def df(self):
+        return self.dataset.get_values_flat(molecule=self.molecule)
+
 
 class Dataset:
     """Representing a dataset consisting of a MoleculeSet specifying molecules and relations
@@ -200,9 +204,16 @@ class Dataset:
     ):
         vals = self.get_samples_value_matrix(molecule=molecule, column=column, samples=samples).stack(dropna=False)
         vals.index.set_names(["id", "sample"], inplace=True)
+        vals = vals.swaplevel()
         if drop_sample_id:
-            vals.reset_index(level=1, drop=True, inplace=True)
+            vals.reset_index(level='sample', drop=True, inplace=True)
         return vals
+
+    def missing_mask(self, molecule: str, column: str = "abundance"):
+        return eq_nan(self.get_column_flat(molecule=molecule, column=column), self.missing_value)
+
+    def non_missing_mask(self, molecule: str, column: str = "abundance"):
+        return ~self.missing_mask(molecule=molecule, column=column)
 
     def set_column_flat(self, molecule: str, values: pd.Series, column: Optional[str] = None):
         """Sets values from a Pandas Series which has a MultiIndex with the levels: "id" and "sample"
@@ -218,6 +229,7 @@ class Dataset:
         for name, group in values.groupby("sample"):
             group = group.droplevel(level="sample")
             sample_values = self.samples_dict[name].values[molecule]
+            #import pdb; pdb.set_trace()
             assert group.index.isin(sample_values.index).all()
             sample_values[column] = group
 

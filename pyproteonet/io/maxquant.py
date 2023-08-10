@@ -40,7 +40,7 @@ def load_maxquant(
     if isinstance(peptides_table, (str, Path)):
         peptides_table = pd.read_csv(peptides_table, sep="\t")
     if isinstance(protein_groups_table, (str, Path)):
-        protein_groups_table = pd.read_csv(peptides_table, sep="\t")
+        protein_groups_table = pd.read_csv(protein_groups_table, sep="\t")
 
     peptides = peptides_table.loc[:, peptide_columns]
     protein_groups = protein_groups_table.loc[:, protein_group_columns]

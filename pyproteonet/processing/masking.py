@@ -12,7 +12,7 @@ from ..data.masked_dataset_iterable import MaskedDatasetIterable
 from ..data.masks import DatasetSampleMask
 
 
-def molecule_mask(
+def mask_molecule(
     dataset: Dataset, mask: Union[pd.Index, List, np.ndarray], molecule: str = "protein"
 ) -> MaskedDataset:
     mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
@@ -21,7 +21,7 @@ def molecule_mask(
         mask.loc[mask, sample_name] = True
     return MaskedDataset(dataset=dataset, mask=mask, molecule=molecule)
 
-def missing_mask(
+def mask_missing(
     dataset: Dataset, molecule: str = "protein", column: str = 'abundance',
 ) -> MaskedDataset:
     mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)

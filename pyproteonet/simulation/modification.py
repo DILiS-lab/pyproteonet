@@ -1,4 +1,5 @@
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Iterable
+import collections
 
 import numpy as np
 import scipy
@@ -47,10 +48,10 @@ def per_molecule_random_scaling(
 
 def introduce_random_condition(
     dataset: Dataset,
-    amount_affected: Union[float, int] = 0.15,
+    affected: Union[float, int, Iterable] = 0.15,
     log2_cond_factor_mean: float = 0,
     log2_cond_factor_std: float = 1,
-    samples_affected: Union[List[str], int, float] = 0.5,
+    samples: Union[List[str], int, float] = 0.5,
     molecule: str = "protein",
     column: str = "abundance",
     result_column: Optional[str] = None,
@@ -62,13 +63,14 @@ def introduce_random_condition(
 
     Args:
         dataset (Dataset): Input Dataset.
-        amount_affected (Union[float, int], optional): Number of affected molecules.
-            Floats in [0, 1.0] are intepreted as relative fractions. Defaults to 0.15.
+        amount_affected (Union[float, int, Iterable], optional): Number of affected molecules or indices of affected molecules.
+            Floats in [0, 1.0] are intepreted as relative fractions, integers are intepreted as absolute values.
+            If an iterable is given it will be interpreted as the molecule indices of the condition affected molecules. Defaults to 0.15.
         log2_cond_factor_mean (float, optional): Mean of normal distribution in log2 space,
             used for sampling conditin factors. Defaults to 0.
         log2_cond_factor_std (float, optional): Std of normal distribution in log2 space,
             used for sampling conditin factors. Defaults to 1.
-        samples_affected (Union[List[str], int, float], optional): If list, will be interpreted as names of samples,
+        samples (Union[List[str], int, float], optional): If list, will be interpreted as names of samples,
             if float will be interpreted as fraction of samples, if int will be interpreted as number of fractions.
             Defaults to 0.5.
         molecule (str, optional): Molecule type to draw values for. Defaults to 'protein'.
@@ -87,20 +89,23 @@ def introduce_random_condition(
         result_column = column
     rng = np.random.default_rng(seed=random_seed)
     condition_samples = dataset.sample_names
-    if isinstance(samples_affected, list):
-        condition_samples = samples_affected
-    elif isinstance(samples_affected, (int, float)):
-        if isinstance(samples_affected, float) and samples_affected <= 1.0:
-            samples_affected = int(len(condition_samples) * samples_affected)
-        condition_samples = rng.choice(condition_samples, size=int(samples_affected))
+    if isinstance(samples, list):
+        condition_samples = samples
+    elif isinstance(samples, (int, float)):
+        if isinstance(samples, float) and samples <= 1.0:
+            samples = int(len(condition_samples) * samples)
+        condition_samples = rng.choice(condition_samples, size=int(samples))
     condition_samples = set(condition_samples)
-    if isinstance(amount_affected, float):
-        amount_affected = int(len(dataset.molecules[molecule]) * amount_affected)
-    condition_affected_mols = rng.choice(
-        dataset.molecules[molecule].index,
-        size=amount_affected,
-        replace=False,
-    )
+    if isinstance(affected, collections.abc.Iterable):
+        condition_affected_mols = affected
+    else:
+        if isinstance(affected, float):
+            affected = int(len(dataset.molecules[molecule]) * affected)
+        condition_affected_mols = rng.choice(
+            dataset.molecules[molecule].index,
+            size=affected,
+            replace=False,
+        )
     factor = rng.normal(
             loc=log2_cond_factor_mean,
             scale=log2_cond_factor_std,

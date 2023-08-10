@@ -14,7 +14,7 @@ def draw_normal_log_space(
     molecule_set: MoleculeSet,
     log_mu: float = 10,
     log_sigma: float = 2,
-    num_samples: int = 10,
+    samples: Union[int, List[str]] = 10,
     molecule: str = "protein",
     column: str = "abundance",
     log_error_mu: float = 0,
@@ -27,7 +27,7 @@ def draw_normal_log_space(
         molecule_set: MoleculeSet for which values are drawn.
         log_mu: Abundance mean in log space. Defaults to 10.
         log_sigma: Abundance std in log space. Defaults to 2.
-        num_samples: Number of samples in result Dataset. Defaults to 10.
+        samples: Number of samples as int or list of sample names for the resulting Dataset. Defaults to 10.
         molecule: Molecule type to draw values for. Defaults to 'protein'.
         column: Column to save drawn values in. Defaults to 'abundance'.
         log_error_mu: Mean of normal distributed error term in log space. Default to 0.
@@ -42,8 +42,10 @@ def draw_normal_log_space(
     log_values = rng.normal(loc=log_mu, scale=log_sigma, size=num_proteins)
     log_errors = rng.normal(loc=log_error_mu, scale=log_error_sigma, size=num_proteins)
     dataset = Dataset(molecule_set=molecule_set)
-    for i in range(num_samples):
+    if isinstance(samples, int):
+        samples = [f"sample{i}" for i in range(samples)]
+    for sample in samples:
         values = pd.DataFrame(data={column:np.exp(log_values + log_errors)}, index=molecule_set.molecules[molecule].index)
         values = {molecule: values}
-        dataset.create_sample(name=f"sample_{i}", values=values)
+        dataset.create_sample(name=sample, values=values)
     return dataset

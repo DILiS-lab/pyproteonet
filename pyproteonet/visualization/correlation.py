@@ -1,15 +1,17 @@
 from typing import List, Callable, Optional, Union
 
+import numpy as np
 from scipy.stats import pearsonr
 from matplotlib import pyplot as plt
 
 from ..data.dataset import Dataset
 
-def correlation_boxplot(
+def plot_correlation_boxplot(
     dataset: Dataset,
     columns: List[str],
     ground_truth: Union[str, List[str]] = "abundance",
     molecule: str = "protein",
+    logarithmize: bool = True,
     correlation_measure: Callable = pearsonr,
     tick_labels: Optional[List[str]] = None,
     print_missingness: bool = True,
@@ -30,6 +32,8 @@ def correlation_boxplot(
             num_missing += (~mask).sum()
             values = sample.values[molecule].loc[mask, column]
             gt = sample.values[molecule].loc[mask, gt_columns[i]]
+            if logarithmize:
+                values, gt = np.log(values), np.log(gt)
             r, p = correlation_measure(gt, values)
             column_correlations.append(r)
         tlabel = column if tick_labels is None else tick_labels[i]

@@ -69,7 +69,7 @@ class GnnPredictor:
                 missing_column_value=self.missing_substitute_value,
             )
             val_dl = GraphDataLoader(test_gds, batch_size=1)
-        trainer = Trainer(logger=self.logger, max_epochs=max_epochs)
+        trainer = Trainer(logger=self.logger, max_epochs=max_epochs, enable_checkpointing=False)
         trainer.fit(self.module, train_dataloaders=train_dl, val_dataloaders=val_dl)
 
     def predict(

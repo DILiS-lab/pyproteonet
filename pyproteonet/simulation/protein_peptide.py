@@ -1,4 +1,4 @@
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Iterable
 
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
@@ -10,60 +10,63 @@ from ..processing.aggregation import neighbor_sum
 
 def simulate_protein_peptide_dataset(
     molecule_set: MoleculeSet,
-    num_samples: int = 10,
+    samples: Union[int, List[str]] = 10,
     log_abundance_mu: float = 10,
     log_abundance_sigma: float = 2,
-    log_protein_error_std: float = 0.3,
+    log_protein_error_sigma: float = 0.3,
     simulate_flyability: bool = True,
     flyability_alpha: float = 5,
     flyability_beta: float = 2.5,
+    peptide_noise_mu: float = 0,
     peptide_noise_sigma: float = 100,
     peptide_poisson_error: bool = True,
-    condition_affected_samples: List[float]=0.0,
-    fraction_affected_by_condition: List[float]=[],
-    log2_condition_means: List[float]=[],
-    log2_condition_stds: List[float]=[],
-    protein_column: str = "abundance",
+    condition_samples: List[Union[float, List[str]]] = [],
+    condition_affected: List[Union[float, int, Iterable]] = [],
+    log2_condition_means: List[float] = [],
+    log2_condition_stds: List[float] = [],
+    protein_column: str = "abundance_gt",
     peptide_column: str = "abundance",
+    protein_molecule: str = "protein",
+    peptide_molecule: str = "peptide",
     mapping: str = "protein",
-    random_seed: Optional[Union[int, float]]=None,
+    random_seed: Optional[Union[int, float]] = None,
 ) -> Dataset:
     dataset = draw_normal_log_space(
         molecule_set=molecule_set,
         log_mu=log_abundance_mu,
         log_sigma=log_abundance_sigma,
-        num_samples=num_samples,
-        molecule="protein",
+        samples=samples,
+        molecule=protein_molecule,
         column=protein_column,
-        random_seed=random_seed
+        random_seed=random_seed,
     )
-    condition_samples = list(dataset.sample_names)[-int(condition_affected_samples * len(dataset)) :]
-    for affected, mean, std in zip(fraction_affected_by_condition, log2_condition_means, log2_condition_stds):
+    for samples, affected, mean, std in zip(condition_samples, condition_affected, log2_condition_means, log2_condition_stds):
         introduce_random_condition(
             dataset,
-            molecule="protein",
+            molecule=protein_molecule,
             column=protein_column,
             inplace=True,
-            amount_affected=affected,
+            affected=affected,
             log2_cond_factor_mean=mean,
             log2_cond_factor_std=std,
-            samples_affected=condition_samples,
-            random_seed=random_seed
+            samples=samples,
+            random_seed=random_seed,
         )
+    ground_truth_prot_vals = dataset.values[protein_molecule][protein_column]
     multiply_exponential_gaussian(
         dataset,
-        molecule="protein",
+        molecule=protein_molecule,
         column=protein_column,
-        sigma=log_protein_error_std,
+        sigma=log_protein_error_sigma,
         inplace=True,
         random_seed=random_seed,
     )
     neighbor_sum(
         dataset,
-        input_molecule="protein",
+        input_molecule=protein_molecule,
         column=protein_column,
         mapping=mapping,
-        result_molecule="peptide",
+        result_molecule=peptide_molecule,
         result_column=peptide_column,
         only_unique=False,
         inplace=True,
@@ -73,20 +76,23 @@ def simulate_protein_peptide_dataset(
             dataset=dataset,
             beta_distr_alpha=flyability_alpha,
             beta_distr_beta=flyability_beta,
-            molecule="peptide",
+            molecule=peptide_molecule,
             column=peptide_column,
             inplace=True,
             random_seed=random_seed,
         )
     add_positive_gaussian(
         dataset,
-        molecule="peptide",
+        molecule=peptide_molecule,
         column=peptide_column,
-        mu=0,
+        mu=peptide_noise_mu,
         sigma=peptide_noise_sigma,
         inplace=True,
         random_seed=random_seed,
     )
     if peptide_poisson_error:
-        poisson_error(dataset=dataset, molecule='peptide', column=peptide_column, random_seed=random_seed, inplace=True)
+        poisson_error(
+            dataset=dataset, molecule=peptide_molecule, column=peptide_column, random_seed=random_seed, inplace=True
+        )
+    dataset.values[protein_molecule][protein_column] = ground_truth_prot_vals
     return dataset

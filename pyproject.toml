@@ -23,3 +23,8 @@ dependencies = [
     "pyopenms",
     "alphapept",
 ]
+[dev-dependencies]
+test = [
+    "fastcore",
+    "nbdev",
+]
