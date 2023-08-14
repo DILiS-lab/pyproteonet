@@ -21,7 +21,7 @@ def generic_fancy_impute(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
+    matrix = dataset.get_samples_value_matrix(molecule=molecule, value_column=column)
     matrix_vals = matrix.values
     missing_mask = eq_nan(matrix_vals, dataset.missing_value)
     matrix_vals[missing_mask] = 0

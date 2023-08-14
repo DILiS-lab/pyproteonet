@@ -11,7 +11,7 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
                             input_column: str = 'abundance', output_column: str = 'condition_abundance', mapping: str = 'gene',
                             condition_affected_frac: Optional[float] = 0.15, condition_affected_proteins: Optional[List] = None,
                             condition_log2_mean: float = 0, condition_log2_std: float = 1,
-                            error_log2_mean: float = 0, error_log2_std: float = 0.1,  inplace: bool = False) -> Dataset:
+                            error_log2_mean: float = 0, error_log2_std: float = 0.1, inplace: bool = False) -> Dataset:
     if condition_affected_frac is None and condition_affected_proteins is None:
         raise AttributeError("Either frac_condition_affected or condition_proteins must be set!")
     if not inplace:
@@ -23,6 +23,16 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
         condition_proteins = proteins.loc[condition_affected_proteins]
     else:
         condition_proteins = proteins.sample(frac=condition_affected_frac, random_state=random_state)
+    dataset.molecules['protein'].loc[:, 'condition_affected'] = False
+    dataset.molecules['protein'].loc[condition_proteins.index, 'condition_affected'] = True
+
+    pep_map = dataset.molecule_set.get_mapped_pairs('protein', 'peptide', mapping=mapping)
+    pep_map['prot_affected'] = dataset.molecules['protein'].loc[pep_map.protein, 'condition_affected'].values
+    peps_affected = pep_map.groupby('peptide').prot_affected.sum()
+    peps_affected = peps_affected[peps_affected > 0]
+    dataset.molecules['peptide'].loc[:, 'condition_affected'] = False
+    dataset.molecules['peptide'].loc[peps_affected.index, 'condition_affected'] = True
+
     condition_effect = np.zeros(len(condition_proteins))
     mask = np.ones(len(condition_proteins), dtype=bool)
     while mask.sum() > 0:

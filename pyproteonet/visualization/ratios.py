@@ -23,8 +23,10 @@ def plot_ratios_volcano(
     scatter_color=None,
     plot_missing: bool = True,
     return_mean: bool = False,
+    point_size: float = 2,
+    label: Optional[str] = None,
 ):
-    values = dataset.get_samples_value_matrix(molecule=molecule, column=column, samples=samples_a + samples_b)
+    values = dataset.get_samples_value_matrix(molecule=molecule, value_column=column, samples=samples_a + samples_b)
     overall_missing = values.to_numpy().flatten()
     overall_missing = np.isnan(overall_missing).sum() / overall_missing.shape[0]
     mean_sum = values.values.sum() / len(values.columns)
@@ -53,7 +55,7 @@ def plot_ratios_volcano(
         mean_abundances = np.log2(mean_abundances) / np.log2(log_base)
     if ratio_log_base is not None:
         ratio = np.log2(ratio) / np.log2(ratio_log_base)
-    ax.scatter(ratio, mean_abundances, color=scatter_color)
+    ax.scatter(ratio, mean_abundances, color=scatter_color, s=point_size, label=label)
     ratio_mean = ratio.mean()
     ratio_existing_abundance = mean_abundances[~ratio.isna()]
     ax.plot(
@@ -92,24 +94,27 @@ def plot_ratios_difference_volcano(
     column: str,
     samples_a: List[str],
     samples_b: List[str],
-    molecule_ids: List[Iterable],
+    molecule_groups: List[Iterable],
+    group_names: Optional[List[str]],
     normalize: bool = False,
     min_samples: int = 1,
     log_base: int = 10,
     ratio_log_base: int = 2,
     ax: Optional[plt.Axes] = None,
     scatter_colors: List[Union[str, Tuple[float, float ,float]]] = ["orange", "green"],
+    point_size: float = 2,
 ):
-    if len(molecule_ids) != len(scatter_colors):
+    if len(molecule_groups) != len(scatter_colors):
         warn(
             "List of molecule id sequences has different length than list of scatter_colors"
             + " used to plot those molecule ratios, using default color for all ratios!"
         )
-        scatter_colors = [None] * len(molecule_ids)
+        scatter_colors = [None] * len(molecule_groups)
     if ax is None:
         fig, ax = plt.subplots()
     means = []
-    for ids, color in zip(molecule_ids, scatter_colors):
+    labels = group_names if group_names is not None else [None] * len(molecule_groups)
+    for ids, color, label in zip(molecule_groups, scatter_colors, labels):
         mean = plot_ratios_volcano(
             dataset=dataset,
             molecule=molecule,
@@ -123,18 +128,26 @@ def plot_ratios_difference_volcano(
             ratio_log_base=ratio_log_base,
             ax=ax,
             scatter_color=color,
+            label=label,
             plot_missing=False,
             return_mean=True,
+            point_size=point_size
         )
         means.append(mean)
-    for i in range(len(means) - 1):
-        start = (means[i], 0.9)
-        end = (means[i + 1], 0.9)
-        ax.annotate("", xy=start, xytext=end, arrowprops=dict(arrowstyle="<->"), xycoords=("data", "axes fraction"))
-        ax.annotate(
-            str(round(means[i + 1] - means[i], 2)),
-            xy=((means[i + 1] + means[i]) / 2, 0.9),
-            size=11,
-            xycoords=("data", "axes fraction"),
-            horizontalalignment="center",
-        )
+    if ratio_log_base is not None:
+        for i in range(len(means) - 1):
+            start = (means[i], 0.9)
+            end = (means[i + 1], 0.9)
+            ax.annotate("", xy=start, xytext=end, arrowprops=dict(arrowstyle="<->"), xycoords=("data", "axes fraction"))
+            diff = round(means[i + 1] - means[i], 2)
+            ax.annotate(
+                str(diff) + f'\n({ratio_log_base}^{diff}={round(ratio_log_base**diff, 2)})' if ratio_log_base is not None else '',
+                xy=((means[i + 1] + means[i]) / 2, 0.9),
+                size=12,
+                weight='bold',
+                xycoords=("data", "axes fraction"),
+                horizontalalignment="center",
+                verticalalignment='bottom'
+            )
+    if group_names is not None:
+        ax.legend()

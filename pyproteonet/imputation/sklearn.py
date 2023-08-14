@@ -19,7 +19,7 @@ def generic_matrix_imputation(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
+    matrix = dataset.get_samples_value_matrix(molecule=molecule, value_column=column)
     matrix_imputed = imputation_function(matrix, **kwargs)
     matrix_imputed = pd.DataFrame(matrix_imputed, columns=matrix.columns)
     dataset.set_samples_value_matrix(matrix=matrix_imputed, molecule=molecule, column=result_column)

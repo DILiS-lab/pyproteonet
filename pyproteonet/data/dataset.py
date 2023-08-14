@@ -98,13 +98,19 @@ class Dataset:
         output_dir: Path,
         molecules: List[str] = ["protein", "peptide"],
         columns: List["str"] = ["abundance"],
+        molecule_columns: Union[bool, List[str]] = [],
+        index_names: Optional[List[str]] = None,
         na_rep="NA",
     ):
         output_dir.mkdir(parents=True, exist_ok=True)
-        for molecule in molecules:
+        if index_names is None:
+            index_names = molecules
+        for molecule, index_name in zip(molecules, index_names):
             for column in columns:
-                vals = self.get_samples_value_matrix(molecule=molecule, column=column)
-                vals.to_csv(output_dir / f"{molecule}_{column}.tsv", sep="\t", na_rep=na_rep)
+                vals = self.get_samples_value_matrix(molecule=molecule, value_column=column, molecule_columns=molecule_columns)
+                vals.index.set_names(index_name, inplace=True)
+                vals = vals.reset_index()
+                vals.to_csv(output_dir / f"{molecule}_{column}.tsv", sep="\t", na_rep=na_rep, index=False)
 
     def __getitem__(self, sample_name: str) -> DatasetSample:
         return self.samples_dict[sample_name]
@@ -194,20 +200,58 @@ class Dataset:
         index = pd.MultiIndex.from_frame(index)
         df.set_index(index, inplace=True)
         return df
+    
+    def get_mapped(self, molecule: str, partner_molecule: str, mapping: str, columns: List[str],
+                   samples: Optional[List] = None, columns_partner: List[str] = [],
+                   molecule_columns:  List[str] = [], molecule_columns_partner: List[str] = [])->pd.DataFrame:
+        if not columns:
+            raise AttributeError("The list of columns needs to contain at least one column!")
+        mapped = self.molecule_set.get_mapped(molecule=molecule, partner_molecule=partner_molecule, mapping=mapping)
+        cols = set(mapped.columns)
+        if samples is None:
+            samples = self.sample_names
+        if 'sample' in mapped.index.names:
+            sample_maps = {sample: m.set_index([molecule, partner_molecule]) for sample,m in mapped.groupby('sample') if sample in samples}
+        else:
+            sample_maps = {}
+            for sample in samples:
+                sample_maps[sample] = mapped.copy()
+        if cols.intersection(columns):
+            raise AttributeError("Result would have duplicated column names!")
+        cols.update(columns)
+        if cols.intersection(columns_partner):
+            raise AttributeError("Result would have duplicated column names!")
+        res = []
+        for sample, map in sample_maps.items():
+            vals = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(molecule), columns]
+            vals.set_index(map.index, inplace=True)
+            if columns_partner:
+                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), molecule_columns_partner]
+                for pc in partner_vals:
+                    print(pc.name)
+                    vals[pc.name] = pc.values
+            vals = pd.concat([vals], keys=[sample], names=['sample'])
+            res.append(vals)
+        return pd.concat(res)
 
     def get_column_flat(
         self,
         molecule: str,
         column: str = "abundance",
         samples: Optional[List[str]] = None,
+        return_missing_mask: bool = False,
         drop_sample_id: bool = False,
     ):
-        vals = self.get_samples_value_matrix(molecule=molecule, column=column, samples=samples).stack(dropna=False)
+        vals = self.get_samples_value_matrix(molecule=molecule, value_column=column, molecule_columns=[],
+                                             samples=samples).stack(dropna=False)
         vals.index.set_names(["id", "sample"], inplace=True)
         vals = vals.swaplevel()
         if drop_sample_id:
             vals.reset_index(level='sample', drop=True, inplace=True)
-        return vals
+        if return_missing_mask:
+            return vals, eq_nan(vals, self.missing_value)
+        else:
+            return vals
 
     def missing_mask(self, molecule: str, column: str = "abundance"):
         return eq_nan(self.get_column_flat(molecule=molecule, column=column), self.missing_value)
@@ -233,13 +277,18 @@ class Dataset:
             assert group.index.isin(sample_values.index).all()
             sample_values[column] = group
 
-    def get_samples_value_matrix(self, molecule: str, column: str = "abundance", samples: Optional[List[str]] = None):
+    def get_samples_value_matrix(self, molecule: str, value_column: str = "abundance", molecule_columns: Union[bool, List[str]] = [],
+                                 samples: Optional[List[str]] = None):
         if samples is None:
             samples = self.sample_names
-        res = pd.DataFrame(data=[], index=self.molecule_set.molecules[molecule].index)
+        if molecule_columns:
+            molecule_columns = list(self.molecules[molecule].columns)
+        res = self.molecules[molecule].loc[:, []].copy()
         for name in samples:
             res[name] = self.missing_value
-            res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, column]
+            res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, value_column]
+        if molecule_columns:
+            res.loc[:, molecule_columns] = self.molecules[molecule].loc[:, molecule_columns]
         return res
 
     def set_samples_value_matrix(self, matrix: pd.DataFrame, molecule: str, column: str = "abundance"):
