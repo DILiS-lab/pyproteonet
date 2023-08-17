@@ -15,7 +15,6 @@ def plot_ratios_volcano(
     samples_a: List[str],
     samples_b: List[str],
     molecule_ids: Optional[Iterable] = None,
-    normalize: bool = False,
     min_samples: int = 1,
     log_base: int = 10,
     ratio_log_base: int = 2,
@@ -29,12 +28,9 @@ def plot_ratios_volcano(
     values = dataset.get_samples_value_matrix(molecule=molecule, value_column=column, samples=samples_a + samples_b)
     overall_missing = values.to_numpy().flatten()
     overall_missing = np.isnan(overall_missing).sum() / overall_missing.shape[0]
-    mean_sum = values.values.sum() / len(values.columns)
     groups = []
     for sample_group in [samples_a, samples_b]:
         sample_group = values.loc[:, sample_group]
-        if normalize:
-            sample_group *= sample_group.sum() / mean_sum
         if molecule_ids is not None:
             sample_group = sample_group.loc[molecule_ids]
         sample_group = sample_group.stack(dropna=False)
@@ -96,13 +92,13 @@ def plot_ratios_difference_volcano(
     samples_b: List[str],
     molecule_groups: List[Iterable],
     group_names: Optional[List[str]],
-    normalize: bool = False,
     min_samples: int = 1,
     log_base: int = 10,
     ratio_log_base: int = 2,
     ax: Optional[plt.Axes] = None,
     scatter_colors: List[Union[str, Tuple[float, float ,float]]] = ["orange", "green"],
     point_size: float = 2,
+    label_percentage_missing: bool = True,
 ):
     if len(molecule_groups) != len(scatter_colors):
         warn(
@@ -114,6 +110,15 @@ def plot_ratios_difference_volcano(
         fig, ax = plt.subplots()
     means = []
     labels = group_names if group_names is not None else [None] * len(molecule_groups)
+    if label_percentage_missing:
+            labels_new = []
+            for group, label in zip(molecule_groups, labels):
+                if label is None:
+                    label = ''
+                vals, mask = dataset.get_column_flat(molecule=molecule, column=column, samples=samples_a + samples_b,
+                                                     ids=group, return_missing_mask=True)
+                labels_new.append(label + f' ({mask.sum() / vals.shape[0] * 100:.2f}% missing)')
+            labels = labels_new
     for ids, color, label in zip(molecule_groups, scatter_colors, labels):
         mean = plot_ratios_volcano(
             dataset=dataset,
@@ -122,7 +127,6 @@ def plot_ratios_difference_volcano(
             samples_a=samples_a,
             samples_b=samples_b,
             molecule_ids=ids,
-            normalize=normalize,
             min_samples=min_samples,
             log_base=log_base,
             ratio_log_base=ratio_log_base,

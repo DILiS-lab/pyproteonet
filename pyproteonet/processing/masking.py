@@ -38,7 +38,7 @@ def train_test_non_missing_no_overlap_iterable(
     column: str = "abundance",
     random_seed: Optional[int] = None,
 ) -> Tuple[MaskedDatasetIterable, MaskedDatasetIterable]:
-    """Generates and iterable dataset with random, non-missing train molecules and a fixed set of test molecules.
+    """Generates an iterable dataset with random, non-missing train molecules and a fixed set of test molecules.
 
     A fixed set of test molecules is sampled once for the dataset. For every sample the subset of those test molecues
     that has non-missing values is used as test set. From the remaining non-missing molecules within the sample a 

@@ -6,6 +6,7 @@ from pandas.core.groupby.generic import SeriesGroupBy
 from tqdm.auto import tqdm
 
 from ..data.dataset import Dataset
+from ..utils.numpy import eq_nan
 
 
 def aggregate_peptides(
@@ -193,28 +194,26 @@ def neighbor_top_n_mean(
     dataset: Dataset,
     top_n: int = 3,
     only_unique: bool = True,
-    input_molecule: str = 'peptide',
+    molecule: str = 'peptide',
     column: str = "abundance",
     result_molecule: str = 'protein',
     result_column: str = None,
     mapping: str = "protein",
     inplace: bool = False,
-    tqdm_bar: bool = False,
 ):
-    def _top_n_mean(groups: SeriesGroupBy) -> pd.Series:
-        return groups.nlargest(top_n).groupby(result_molecule).mean()[groups.count() >= top_n]
-
-    return aggregate_peptides(
-        dataset=dataset,
-        aggregation_fn=_top_n_mean,
-        only_unique=only_unique,
-        input_molecule=input_molecule,
-        column=column,
-        result_molecule=result_molecule,
-        result_column=result_column,
-        mapping=mapping,
-        inplace=inplace,
-        tqdm_bar=tqdm_bar,
-    )
+    if not inplace:
+        dataset = dataset.copy()
+    mapped = dataset.get_mapped(molecule=molecule, partner_molecule=result_molecule, columns=[column], mapping=mapping)
+    mapped.rename(columns={column:'quanti'}, inplace=True)
+    degs = dataset.molecule_set.get_mapping_degrees(molecule=molecule, partner_molecule=result_molecule, mapping=mapping)
+    mapped['deg'] = degs.loc[mapped.index.get_level_values(level=molecule)].values
+    mapped = mapped[~eq_nan(mapped.quanti, dataset.missing_value)]
+    if only_unique:
+        mapped = mapped[mapped.deg==1]
+    group = mapped.quanti.sort_values(ascending=False).groupby(['sample', result_molecule]).head(top_n).groupby(['sample',result_molecule])
+    res = group.mean()[group.count() >= top_n]
+    dataset.values[result_molecule][result_column] = res
+    if not inplace:
+        return dataset
     
     

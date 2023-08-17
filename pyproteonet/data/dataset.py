@@ -239,11 +239,12 @@ class Dataset:
         molecule: str,
         column: str = "abundance",
         samples: Optional[List[str]] = None,
+        ids: Optional[Iterable] = None,
         return_missing_mask: bool = False,
         drop_sample_id: bool = False,
     ):
         vals = self.get_samples_value_matrix(molecule=molecule, value_column=column, molecule_columns=[],
-                                             samples=samples).stack(dropna=False)
+                                             samples=samples, ids=ids).stack(dropna=False)
         vals.index.set_names(["id", "sample"], inplace=True)
         vals = vals.swaplevel()
         if drop_sample_id:
@@ -278,12 +279,15 @@ class Dataset:
             sample_values[column] = group
 
     def get_samples_value_matrix(self, molecule: str, value_column: str = "abundance", molecule_columns: Union[bool, List[str]] = [],
-                                 samples: Optional[List[str]] = None):
+                                 samples: Optional[List[str]] = None, ids: Optional[Iterable] = None):
         if samples is None:
             samples = self.sample_names
         if molecule_columns:
             molecule_columns = list(self.molecules[molecule].columns)
-        res = self.molecules[molecule].loc[:, []].copy()
+        if ids is not None:
+            res = self.molecules[molecule].loc[ids, []].copy()
+        else:
+            res = self.molecules[molecule].loc[:, []].copy()
         for name in samples:
             res[name] = self.missing_value
             res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, value_column]

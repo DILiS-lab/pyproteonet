@@ -101,8 +101,6 @@ class MoleculeSet:
         mapped= self.get_mapped_pairs(molecule_a=molecule, molecule_b=partner_molecule, mapping=mapping)
         mapped.set_index([molecule, partner_molecule], inplace=True)
         mol_vals = self.molecules[molecule].loc[mapped.index.get_level_values(molecule), molecule_columns]
-        if set(molecule_columns).intersection(molecule_columns_partner):
-            raise AttributeError("Overlap between molecule_columns and molecule_columns_partner!")
         for mc in mol_vals:
             mapped[mc.name] =mc.values
         mol_vals = self.molecules[partner_molecule].loc[mapped.index.get_level_values(partner_molecule),molecule_columns]
