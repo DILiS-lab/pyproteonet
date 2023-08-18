@@ -1,6 +1,7 @@
 from typing import Optional, Callable
 
 import numpy as np
+import lightning.pytorch as pl
 
 from ..data.dataset import Dataset
 from ..predictors.gnn_predictor import GnnPredictor
@@ -19,6 +20,7 @@ def gnn_impute(
     partner_column: Optional[str] = None,
     train_frac: float = 0.1,
     test_frac: float = 0.2,
+    module: Optional[pl.LightningModule] = None,
     model: Callable = GAT(in_dim=3, hidden_dim=40, out_dim=1, num_heads=20),
     missing_substitute_value: float = 0.0,
     max_epochs: int = 20,
@@ -26,6 +28,8 @@ def gnn_impute(
 ) -> Dataset:
     if result_column is None:
         result_column = column
+    if not isinstance(result_column, (list, tuple)):
+        result_column = [result_column]
     if not inplace:
         dataset = dataset.copy()
 
@@ -51,6 +55,7 @@ def gnn_impute(
         value_columns=["gnninput"],
         molecule_columns=[],
         target_column="gnninput",
+        module=module,
         model=model,
         bidirectional_graph=True,
         missing_substitute_value=missing_substitute_value,
@@ -58,7 +63,11 @@ def gnn_impute(
     )
     gnn_predictor.fit(train_mds=train_mds, test_mds=test_mds, max_epochs=max_epochs)
     missing_mds = mask_missing(dataset=gnnds, molecule=molecule, column="gnninput")
-    gnn_predictor.predict(mds=missing_mds, result_column="gnnresult")
-    vals = gnnds.values[molecule]["gnnresult"]
-    dataset.values[molecule][result_column] = np.exp((vals * std) + mean)
+    gnn_predictor.predict(mds=missing_mds, result_column=[f"res{i}" for i,c in enumerate(result_column)])
+    for i,c in enumerate(result_column):
+        vals = gnnds.values[molecule][f"res{i}"]
+        if i == 0:
+            dataset.values[molecule][c] = np.exp((vals * std) + mean)
+        else:
+            dataset.values[molecule][c] = np.exp(vals * std)
     return dataset

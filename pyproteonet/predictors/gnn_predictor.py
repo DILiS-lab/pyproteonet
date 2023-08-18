@@ -1,4 +1,4 @@
-from typing import Union, Dict, List, TYPE_CHECKING, Optional
+from typing import Union, Dict, List, TYPE_CHECKING, Optional, Tuple
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +7,7 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import Logger
 import torch
 from torch import nn
+import lightning.pytorch as pl
 
 from ..dgl.gnn_architectures.gat import GAT
 from ..dgl.gnn_architectures.resettable_module import ResettableModule
@@ -22,6 +23,7 @@ class GnnPredictor:
         value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
         molecule_columns: List[str] = [],
         target_column: str = "abundance",
+        module: Optional[pl.LightningModule] = None,
         model: ResettableModule = GAT(in_dim=4, hidden_dim=40, out_dim=1, num_heads=20),
         missing_substitute_value: float = 00,
         bidirectional_graph: bool = True,
@@ -34,12 +36,16 @@ class GnnPredictor:
         self.model = model
         self.missing_substitute_value = missing_substitute_value
         self.bidirectional_graph = bidirectional_graph
-        self.module = NodeRegressionModule(
-            model=self.model,
-            nan_substitute_value=missing_substitute_value,
-            mask_substitute_value=missing_substitute_value,
-            hide_substitute_value=missing_substitute_value,
-        )
+        self.module = module
+        if self.module is None:
+            if model is None:
+                raise AttributeError("Please either specify a model or a lightning module!")
+            self.module = NodeRegressionModule(
+                model=self.model,
+                nan_substitute_value=missing_substitute_value,
+                mask_substitute_value=missing_substitute_value,
+                hide_substitute_value=missing_substitute_value,
+            )
         self.logger = logger
 
     def fit(
@@ -75,11 +81,17 @@ class GnnPredictor:
     def predict(
         self,
         mds: AbstractMaskedDataset,
-        result_column: Optional[str] = None,
+        result_column: Optional[Union[str, Tuple[str]]] = None,
         copy_non_predicted_from_target_column: bool = True,
     ):
         if result_column is None:
             result_column = self.target_column
+        if not isinstance(result_column, (list, tuple)):
+            result_column = [result_column]
+        if self.module.out_dim != len(result_column):
+            raise AttributeError(
+                f"The prediction module has {self.module.out_dim} output dimensions but {len(result_column)} result column names were given!"
+            )
         # graph = sample.molecule_set.create_graph(mapping=mapping).to_dgl()
         # sample.populate_graph_dgl(graph, value_columns=value_columns, mapping=mapping)
         graph_ds = mds.get_graph_dataset_dgl(
@@ -102,12 +114,21 @@ class GnnPredictor:
                 prediction = prediction[mask_nodes]
                 sample = graph_ds.index_to_sample(i)
                 if copy_non_predicted_from_target_column:
-                    sample.values[mds.molecule].loc[:, result_column] = sample.values[mds.molecule].loc[:, self.target_column]
+                    #TODO
+                    sample.values[mds.molecule].loc[:, result_column[0]] = sample.values[mds.molecule].loc[
+                        :, self.target_column
+                    ]
                 else:
-                    sample.values[mds.molecule].loc[:, result_column] = sample.dataset.missing_value
+                    sample.values[mds.molecule].loc[:, result_column[1:]] = sample.dataset.missing_value
                 molecules = graph.nodes.loc[mask_nodes.nonzero(), "molecule_id"].values  # type: ignore
-                sample.values[mds.molecule].loc[molecules, result_column] = prediction.detach().squeeze().numpy()
+                prediction = prediction.detach().squeeze().numpy()
+                for i, c in enumerate(result_column):
+                    sample.values[mds.molecule].loc[molecules, c] = prediction[:, i]
 
+    @property
+    def out_dim(self):
+        return self.model.out_dim
+    
     def reset_parameters(self):
         self.model.reset_parameters()
 

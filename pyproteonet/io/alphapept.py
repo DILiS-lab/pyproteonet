@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Dict, Tuple, Optional
 
 import pandas as pd
 import numpy as np
@@ -7,15 +7,50 @@ import h5py
 
 from ..data import MoleculeSet, Dataset
 
+def load_alphapept_result(
+    base_path: Union[str, Path],
+    value_fields: List[str] = ['ms1_int_sum_apex'],
+    molecules: Union[Dict[str, str], List[str]]={'protein_group':'protein_group', 'sequence':'peptide'},
+    mappings: List[Tuple[str, str]] = [('protein_group', 'sequence')],
+    skip_decoys: bool=True,
+    keep_razor_mapping: bool=True,
+)->Dataset:
+    base_path = Path(base_path)
+    database = h5py.File(base_path / "database.hdf", "r")
+    protein_fdr = pd.read_hdf(base_path / "results.hdf", "protein_fdr")
+    if skip_decoys:
+        protein_fdr = protein_fdr[~protein_fdr.decoy]
+    sequences = np.array(database["peptides"]["sequences"])
+    prot_indices = np.array(database["peptides"]["protein_indices"])
+    db_pointers = np.array(database["peptides"]["protein_indptr"])
+    prots = pd.Series(database["proteins"]["name"]).iloc[prot_indices].astype(str).reset_index(drop=True)
+    pep_pointers, prot_pointers = [], []
+    for i in range(len(sequences)):
+        target_prots = range(db_pointers[i], db_pointers[i + 1])
+        prot_pointers.extend(target_prots)
+        pep_pointers.extend([i] * len(target_prots))
+    pep_prot_mapping = pd.DataFrame({"id": sequences[pep_pointers].astype(str), "map_id": prots.iloc[prot_pointers]})
+
+    molecule_dfs = {}
+    if isinstance(molecules, (list, tuple)):
+        molecules = {mol:mol for mol in molecules}
+    for mol, name in molecules.item():
+        molecules[name] = pd.DataFrame(index = protein_fdr[mol].unique)
+    for mapping in mappings:
+        if 'protein_group' in mapping:
+            pass
+    #TODO: WIP
 
 def load_alphapept_result(
     base_path: Union[str, Path],
     peptide_id_field: str="sequence",
     summed_peptide_fields: List[str]=["ms1_int_sum_apex"],
-    averaged_peptide_fields: List[str]=["mass"],
+    averaged_peptide_fields: List[str]=[],
     per_sample_fields: List[str]=["ms1_int_sum_apex"],
     skip_decoys: bool=True,
     keep_razor_mapping: bool=True,
+    keep_spectra: bool = True,
+    samples: Optional[List[str]] = None,
 )->Dataset:
     """Reads a Dataset from a directory containing results of the Alphapept analysis pipeline.
 
@@ -33,6 +68,8 @@ def load_alphapept_result(
         keep_razor_mapping (bool, optional): Generate a separate mapping which equals the mapping used by alphapepts quantification.
           In such a mapping every peptide is assigned to exactly one peptide group. If there are multiple possible peptide groups
           the peptide is assigned the group with the most found peptides (razor peptide). Defaults to True.
+        keep_sptectra (bool, optional): Keep all spectra information as values under the key 'spectra'. Defaults to True.
+        samples: (List[str], optional): Only load certain samples, if None load all samples. Defaults to None.
 
     Returns:
         Dataset: The loaded dataset
@@ -40,6 +77,8 @@ def load_alphapept_result(
     base_path = Path(base_path)
     database = h5py.File(base_path / "database.hdf", "r")
     protein_fdr = pd.read_hdf(base_path / "results.hdf", "protein_fdr")
+    if samples is not None:
+        protein_fdr = protein_fdr[protein_fdr.sample_group.isin(samples)]
     if skip_decoys:
         protein_fdr = protein_fdr[~protein_fdr.decoy]
     sequences = np.array(database["peptides"]["sequences"])
@@ -92,7 +131,13 @@ def load_alphapept_result(
         mappings["razor"] = razor_mapping
     ms = MoleculeSet(molecules=molecules, mappings=mappings)
     ds = Dataset(molecule_set=ms)
+    spec_groups = {}
+    if keep_spectra:
+        spec_groups = {sample:vals for sample, vals in protein_fdr.groupby('sample_group')}
     for name, values in sample_peptides.groupby("sample_group"):
         values.reset_index(level=["sample_group"], drop=True, inplace=True)
-        ds.create_sample(name=name, values={"peptide": values})
+        values = {"peptide": values}
+        if keep_spectra:
+            values['spectrum'] = spec_groups[name]
+        ds.create_sample(name=name, values=values)
     return ds

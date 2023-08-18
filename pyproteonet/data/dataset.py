@@ -124,6 +124,8 @@ class Dataset:
             else:
                 values[mol] = pd.DataFrame(data=values[mol], index=mol_df.index)
             values[mol].index.name = "id"
+        for key, vals in [(key, vals) for key, vals in values.items() if key not in self.molecules.keys()]:
+            values[key] = vals
         self.samples_dict[name] = DatasetSample(dataset=self, values=values)
 
     @property
