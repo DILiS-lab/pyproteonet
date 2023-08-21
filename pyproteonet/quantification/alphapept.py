@@ -29,10 +29,10 @@ def _dataset_to_alphapept_frame(
             molecule_a=molecule, molecule_b=mapping_molecule, mapping=mapping
         )
         # map_pairs.set_index(molecule, verify_integrity=True, inplace=True)
-        df = df.merge(map_pairs[[molecule, "map_id"]], left_on="id", right_on=molecule, how="inner")
+        df = df.merge(map_pairs[[molecule, mapping_molecule]], left_on="id", right_on=molecule, how="inner")
         del df[molecule]
         # df["protein_group"] = map_pairs.loc[df.id][mapping_molecule].values
-    df.rename(columns={"sample": "sample_group", "id": "precursor", "map_id": "protein_group"}, inplace=True)
+    df.rename(columns={"sample": "sample_group", "id": "precursor", mapping_molecule: "protein_group"}, inplace=True)
     return df
 
 

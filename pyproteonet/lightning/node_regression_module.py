@@ -35,6 +35,7 @@ class NodeRegressionModule(pl.LightningModule):
             "hide_substitute_value",
             "lr",
         )
+        self.out_dim = 1 #TODO
 
     def forward(self, graph):
         features = graph.nodes["molecule"].data["x"].float()

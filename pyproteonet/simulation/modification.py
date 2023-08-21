@@ -4,6 +4,7 @@ import collections
 import numpy as np
 import scipy
 
+from .utils import get_numpy_random_generator
 from ..data.dataset import Dataset
 
 
@@ -15,7 +16,7 @@ def per_molecule_random_scaling(
     beta_distr_alpha: float = 5,
     beta_distr_beta: float = 2.5,
     inplace: bool = False,
-    random_seed: Optional[int] = None
+    random_seed: Optional[Union[np.random.Generator, int]] = None
 ) -> Dataset:
     """Draws a random factor within [0,1] for each molecule of the given type and multiplies all column values across all samples with it.
 
@@ -36,7 +37,7 @@ def per_molecule_random_scaling(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     scaling_factors = scipy.stats.beta.rvs(
             a=beta_distr_alpha, b=beta_distr_beta, size=len(dataset.molecules[molecule]), random_state=rng
         )
@@ -56,7 +57,7 @@ def introduce_random_condition(
     column: str = "abundance",
     result_column: Optional[str] = None,
     inplace: bool = False,
-    random_seed: Optional[int] = None
+    random_seed: Optional[Union[int, np.random.Generator]] = None
 ) -> Dataset:
     """Samples condition factors for a subset of randomly chosen molecues
        and multiplies the molecules values of affected with those factors.
@@ -87,7 +88,7 @@ def introduce_random_condition(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     condition_samples = dataset.sample_names
     if isinstance(samples, list):
         condition_samples = samples

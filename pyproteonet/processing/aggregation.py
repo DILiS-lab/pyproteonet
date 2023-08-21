@@ -25,7 +25,7 @@ def aggregate_peptides(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    mapped = dataset.molecule_set.get_mapped_pairs(result_molecule, input_molecule, mapping=mapping)
+    mapped = dataset.molecule_set.get_mapped_pairs(molecule_a=result_molecule, molecule_b=input_molecule, mapping=mapping)
     unique_peptides = []
     if only_unique:
         unique_peptides = mapped.groupby(input_molecule)[result_molecule].count()
@@ -198,14 +198,16 @@ def neighbor_top_n_mean(
     column: str = "abundance",
     result_molecule: str = 'protein',
     result_column: str = None,
-    mapping: str = "protein",
+    mapping: str = None,
     inplace: bool = False,
 ):
     if not inplace:
         dataset = dataset.copy()
     mapped = dataset.get_mapped(molecule=molecule, partner_molecule=result_molecule, columns=[column], mapping=mapping)
     mapped.rename(columns={column:'quanti'}, inplace=True)
-    degs = dataset.molecule_set.get_mapping_degrees(molecule=molecule, partner_molecule=result_molecule, mapping=mapping)
+    if mapping is None:
+        mapping = result_molecule
+    degs = dataset.molecule_set.get_mapping_degrees(molecule=molecule, mapping=mapping, partner_molecule=result_molecule)
     mapped['deg'] = degs.loc[mapped.index.get_level_values(level=molecule)].values
     mapped = mapped[~eq_nan(mapped.quanti, dataset.missing_value)]
     if only_unique:

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 from typing import Optional
 
@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from .utils import get_numpy_random_generator
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
 
@@ -18,7 +19,7 @@ def add_positive_gaussian(
     mu: float = 0,
     sigma: float = 1,
     inplace: bool = False,
-    random_seed: Optional[int] = None,
+    random_seed: Optional[Union[int, np.random.Generator]] = None,
 ) -> Dataset:
     """For every sample and value of the given molecule and column add the absolute value of an error drawn from a normal distribution.
         Can be used to simulate background noise observed during measurements.
@@ -40,7 +41,7 @@ def add_positive_gaussian(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     for sample in dataset.samples:
         vals = sample.values[molecule].loc[:, column]
         error = rng.normal(loc=mu, scale=sigma, size=len(vals))
@@ -55,7 +56,7 @@ def multiply_exponential_gaussian(
     result_column: Optional[str] = None,
     sigma: float = 0.33,
     inplace: bool = False,
-    random_seed: Optional[int] = None,
+    random_seed: Optional[Union[int, np.random.Generator]] = None,
 ) -> Dataset:
     """For every sample and value of the given molecule and column multiply the value by e**error, with error drawn from a normal distribution.
 
@@ -75,7 +76,7 @@ def multiply_exponential_gaussian(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     for sample in dataset.samples:
         vals = sample.values[molecule].loc[:, column]
         error = rng.normal(loc=0, scale=sigma, size=len(vals))
@@ -92,7 +93,7 @@ def add_std_correlated_gaussian(
     sigma_factor: float = 0.33,
     clip: bool = True,
     inplace: bool = False,
-    random_seed: Optional[int] = None,
+    random_seed: Optional[Union[int, np.random.Generator]] = None,
 ) -> Dataset:
     """For every sample and value of the given molecule and column add the absolute value of an error
         drawn from a normal distribution whose stand deviation is the original value times the std_factor.
@@ -114,7 +115,7 @@ def add_std_correlated_gaussian(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
 
     for sample in dataset.samples:
         vals = sample.values[molecule].loc[:, column]
@@ -132,13 +133,13 @@ def poisson_error(
     column: str = "abundance",
     result_column: Optional[str] = None,
     inplace: bool = False,
-    random_seed: Optional[int] = None,
+    random_seed: Optional[Union[int, np.random.Generator]] = None,
 ):
     if not inplace:
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     for sample in dataset.samples:
         vals, mask = sample.get_values(molecule=molecule, column=column, return_missing_mask=True)
         mask = ~mask

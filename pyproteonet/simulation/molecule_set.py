@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 import scipy
 
+from .utils import get_numpy_random_generator
 from ..data.dataset_sample import DatasetSample
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
@@ -39,7 +40,7 @@ def simulate_molecule_set_protein_peptide(num_peptides = 1000, num_proteins = 10
                                           relative_peptide_node_degrees = [0.25, 0.5, 0.25],
                                           relative_protein_node_degrees = None,
                                           random_seed = None, *args, **kwargs):
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     #Simulate peptide to protein correspondences
     peptide_node_degrees = _relative_to_absolute_node_degrees(relative_peptide_node_degrees, num_peptides)
     protein_deg_distribution = None

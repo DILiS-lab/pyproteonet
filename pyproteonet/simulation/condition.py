@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
 
+from .utils import get_numpy_random_generator
 from ..data.dataset import Dataset
 
 
@@ -17,7 +18,7 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
     if not inplace:
         dataset = dataset.copy()
     condition_affected = set(condition_affected_samples)
-    rng = np.random.default_rng(seed=random_state)
+    rng = get_numpy_random_generator(seed=random_state)
     proteins = dataset.molecules['protein'].copy()
     if condition_affected_proteins is not None:
         condition_proteins = proteins.loc[condition_affected_proteins]
@@ -26,7 +27,7 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
     dataset.molecules['protein'].loc[:, 'condition_affected'] = False
     dataset.molecules['protein'].loc[condition_proteins.index, 'condition_affected'] = True
 
-    pep_map = dataset.molecule_set.get_mapped_pairs('protein', 'peptide', mapping=mapping)
+    pep_map = dataset.molecule_set.get_mapped_pairs(molecule_a='protein', molecule_b='peptide', mapping=mapping)
     pep_map['prot_affected'] = dataset.molecules['protein'].loc[pep_map.protein, 'condition_affected'].values
     peps_affected = pep_map.groupby('peptide').prot_affected.sum()
     peps_affected = peps_affected[peps_affected > 0]
@@ -40,7 +41,7 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
         mask = np.abs(condition_effect) < 1
     condition_proteins['condition_effect'] = condition_effect
     #proteins.loc[condition_proteins.index, 'condition_effect'] = condition_effect
-    mapped = dataset.molecule_set.get_mapped_pairs("protein", "peptide", mapping=mapping)
+    mapped = dataset.molecule_set.get_mapped_pairs(molecule_a="protein", molecule_b="peptide", mapping=mapping)
     mapped_condition_mask = mapped.protein.isin(condition_proteins.index)
     for sample_name, sample in tqdm(dataset.samples_dict.items()):
         protein_values = sample.values['protein']

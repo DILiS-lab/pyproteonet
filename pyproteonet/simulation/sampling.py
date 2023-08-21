@@ -5,6 +5,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 import scipy
 
+from .utils import get_numpy_random_generator
 from ..data.dataset_sample import DatasetSample
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
@@ -19,7 +20,7 @@ def draw_normal_log_space(
     column: str = "abundance",
     log_error_mu: float = 0,
     log_error_sigma: float = 0,
-    random_seed=None,
+    random_seed: Optional[Union[int, np.random.Generator]] = None,
 ) -> Dataset:
     """Draws molecule values from normal distribution in log space and copies result across multiple samples to create a Dataset.
 
@@ -38,13 +39,13 @@ def draw_normal_log_space(
         Dataset: The created Dataset.
     """
     num_proteins = len(molecule_set.molecules[molecule])
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     log_values = rng.normal(loc=log_mu, scale=log_sigma, size=num_proteins)
-    log_errors = rng.normal(loc=log_error_mu, scale=log_error_sigma, size=num_proteins)
     dataset = Dataset(molecule_set=molecule_set)
     if isinstance(samples, int):
         samples = [f"sample{i}" for i in range(samples)]
     for sample in samples:
+        log_errors = rng.normal(loc=log_error_mu, scale=log_error_sigma, size=num_proteins)
         values = pd.DataFrame(data={column:np.exp(log_values + log_errors)}, index=molecule_set.molecules[molecule].index)
         values = {molecule: values}
         dataset.create_sample(name=sample, values=values)

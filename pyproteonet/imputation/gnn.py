@@ -25,6 +25,8 @@ def gnn_impute(
     missing_substitute_value: float = 0.0,
     max_epochs: int = 20,
     inplace: bool = True,
+    check_val_every_n_epoch: int = 1,
+    silent: bool = False,
 ) -> Dataset:
     if result_column is None:
         result_column = column
@@ -37,7 +39,6 @@ def gnn_impute(
     vals = np.log(dataset.values[molecule][column])
     mean = vals.mean()
     std = vals.std()
-    #import pdb; pdb.set_trace()
     gnnds.values[molecule]["gnninput"] = (vals - mean) / std
     if partner_molecule is not None:
         if partner_column is None:
@@ -50,6 +51,10 @@ def gnn_impute(
     train_mds, test_mds = train_test_non_missing_no_overlap_iterable(
         dataset=gnnds, train_frac=train_frac, test_frac=test_frac, molecule=molecule, column="gnninput"
     )
+    if silent:
+        logger = None
+    else:
+        logger = ConsoleLogger()
     gnn_predictor = GnnPredictor(
         mapping=mapping,
         value_columns=["gnninput"],
@@ -59,12 +64,20 @@ def gnn_impute(
         model=model,
         bidirectional_graph=True,
         missing_substitute_value=missing_substitute_value,
-        logger=ConsoleLogger(),
+        logger=logger,
     )
-    gnn_predictor.fit(train_mds=train_mds, test_mds=test_mds, max_epochs=max_epochs)
+    gnn_predictor.fit(
+        train_mds=train_mds,
+        test_mds=test_mds,
+        max_epochs=max_epochs,
+        silent=silent,
+        check_val_every_n_epoch=check_val_every_n_epoch,
+    )
     missing_mds = mask_missing(dataset=gnnds, molecule=molecule, column="gnninput")
-    gnn_predictor.predict(mds=missing_mds, result_column=[f"res{i}" for i,c in enumerate(result_column)])
-    for i,c in enumerate(result_column):
+    gnn_predictor.predict(
+        mds=missing_mds, result_column=[f"res{i}" for i, c in enumerate(result_column)], silent=silent
+    )
+    for i, c in enumerate(result_column):
         vals = gnnds.values[molecule][f"res{i}"]
         if i == 0:
             dataset.values[molecule][c] = np.exp((vals * std) + mean)

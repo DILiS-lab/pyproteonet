@@ -69,6 +69,7 @@ class Dataset:
             missing_value = dataset_info["missing_value"]
         ds = cls(molecule_set=molecule_set, missing_value=missing_value)
         samples = glob.glob(f'{dir_path / "samples"}/*.h5')
+        samples.sort()
         for sample in samples:
             sample_path = Path(sample)
             values = {}
@@ -208,7 +209,8 @@ class Dataset:
                    molecule_columns:  List[str] = [], molecule_columns_partner: List[str] = [])->pd.DataFrame:
         if not columns:
             raise AttributeError("The list of columns needs to contain at least one column!")
-        mapped = self.molecule_set.get_mapped(molecule=molecule, partner_molecule=partner_molecule, mapping=mapping)
+        mapped = self.molecule_set.get_mapped(molecule=molecule, partner_molecule=partner_molecule, mapping=mapping,
+                                              molecule_columns=molecule_columns, molecule_columns_partner=molecule_columns_partner)
         cols = set(mapped.columns)
         if samples is None:
             samples = self.sample_names
@@ -228,7 +230,7 @@ class Dataset:
             vals = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(molecule), columns]
             vals.set_index(map.index, inplace=True)
             if columns_partner:
-                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), molecule_columns_partner]
+                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), columns_partner]
                 for pc in partner_vals:
                     print(pc.name)
                     vals[pc.name] = pc.values

@@ -24,7 +24,7 @@ logger = logging.Logger("graph_creation")
 
 def create_graph_nodes_edges(
     molecule_set: "MoleculeSet",
-    mapping: str = "gene",
+    mappings: List[str],
     make_bidirectional: bool = True,
     add_self_edges: bool = True,
     node_type_mapping: Optional[Dict[str, int]] = None,
@@ -41,12 +41,12 @@ def create_graph_nodes_edges(
         offset += size
         node_mapping[key] = pd.DataFrame({"node_id": node_ids}, index=index)
     edges = []
-    for source_key, destination_key in itertools.combinations(molecule_set.molecules.keys(), 2):
-        sources = molecule_set.mappings[mapping][source_key].copy()
-        sources["source_node"] = node_mapping[source_key].loc[sources.id, "node_id"].to_numpy()
-        destinations = molecule_set.mappings[mapping][destination_key].copy()
-        destinations["destination_node"] = node_mapping[destination_key].loc[destinations.id, "node_id"].to_numpy()
-        edges.append(sources.merge(destinations, on="map_id", how="inner").loc[:, ["source_node", "destination_node"]])
+    for mapping in mappings:
+        mapped = molecule_set.get_mapped(mapping=mapping)
+        source_key, destination_key = mapped.index.names
+        mapped["source_node"] = node_mapping[source_key].loc[mapped.index.get_level_values(source_key), "node_id"].to_numpy()
+        mapped["destination_node"] = node_mapping[destination_key].loc[mapped.index.get_level_values(destination_key), "node_id"].to_numpy()
+        edges.append(mapped.loc[:, ["source_node", "destination_node"]])
     edges = pd.concat(edges, ignore_index=True)
     if make_bidirectional:
         edges2 = pd.DataFrame({"source_node": edges.destination_node, "destination_node": edges.source_node})

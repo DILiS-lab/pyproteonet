@@ -45,14 +45,15 @@ def load_maxquant(
     peptides = peptides_table.loc[:, peptide_columns]
     protein_groups = protein_groups_table.loc[:, protein_group_columns]
     map = peptides_table["Protein group IDs"].str.split(";").explode().astype(int)
-    map = map.reset_index().rename(columns={"index": "id", "Protein group IDs": "map_id"})
-    mapping_protein_group = {
-        "protein_group": pd.DataFrame({"id": protein_groups.index, "map_id": protein_groups.index}),
-        "peptide": map,
-    }
+    map = map.reset_index().rename(columns={"index": "peptide", "Protein group IDs": "protein_group"})
+    map.set_index(['peptide', 'protein_group'], inplace=True, drop=True)
+    # mapping_protein_group = {
+    #     "protein_group": pd.DataFrame({"id": protein_groups.index, "map_id": protein_groups.index}),
+    #     "peptide": map,
+    # }
     ms = MoleculeSet(
         molecules={"peptide": peptides, "protein_group": protein_groups},
-        mappings={"protein_group": mapping_protein_group},
+        mappings={"protein_group-peptide": map},
     )
     ds = Dataset(molecule_set=ms)
     for sample in samples:

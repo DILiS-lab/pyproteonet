@@ -1,5 +1,6 @@
 from typing import Union, Dict, List, TYPE_CHECKING, Optional, Tuple
 from pathlib import Path
+import logging
 
 import numpy as np
 from dgl.dataloading import GraphDataLoader
@@ -54,6 +55,8 @@ class GnnPredictor:
         test_mds: Optional[AbstractMaskedDataset],
         max_epochs: int = 10,
         reset_parameters: bool = False,
+        silent: bool = False,
+        check_val_every_n_epoch: int = 1,
     ):
         if reset_parameters:
             self.reset_parameters()
@@ -75,14 +78,28 @@ class GnnPredictor:
                 missing_column_value=self.missing_substitute_value,
             )
             val_dl = GraphDataLoader(test_gds, batch_size=1)
-        trainer = Trainer(logger=self.logger, max_epochs=max_epochs, enable_checkpointing=False)
+        #ptl_logger = logging.getLogger("lightning.pytorch")
+        #plt_log_level = ptl_logger.level
+        #if silent:
+        #    ptl_logger.setLevel(logging.ERROR)
+        trainer = Trainer(
+            logger=self.logger,
+            max_epochs=max_epochs,
+            enable_checkpointing=False,
+            enable_progress_bar=not silent,
+            enable_model_summary=not silent,
+            check_val_every_n_epoch=check_val_every_n_epoch,
+        )
         trainer.fit(self.module, train_dataloaders=train_dl, val_dataloaders=val_dl)
+        #if silent:
+        #    ptl_logger.setLevel(plt_log_level)
 
     def predict(
         self,
         mds: AbstractMaskedDataset,
         result_column: Optional[Union[str, Tuple[str]]] = None,
         copy_non_predicted_from_target_column: bool = True,
+        silent: bool = False,
     ):
         if result_column is None:
             result_column = self.target_column
@@ -105,8 +122,14 @@ class GnnPredictor:
         graph = graph_ds.graph
         dl = GraphDataLoader(graph_ds, batch_size=1)
         with torch.no_grad():
-            trainer = Trainer()
+            #ptl_logger = logging.getLogger("lightning.pytorch")
+            #plt_log_level = ptl_logger.level
+            #if silent:
+            #   ptl_logger.setLevel(logging.ERROR)
+            trainer = Trainer(enable_progress_bar=not silent, enable_model_summary=not silent)
             predictions = trainer.predict(self.module, dl)
+            #if silent:
+            #    ptl_logger.setLevel(plt_log_level)
             for i, prediction in enumerate(predictions):
                 batch = graph_ds[i]
                 mask_nodes = batch.ndata["mask"].detach().squeeze().numpy()
@@ -114,21 +137,21 @@ class GnnPredictor:
                 prediction = prediction[mask_nodes]
                 sample = graph_ds.index_to_sample(i)
                 if copy_non_predicted_from_target_column:
-                    #TODO
+                    # TODO
                     sample.values[mds.molecule].loc[:, result_column[0]] = sample.values[mds.molecule].loc[
                         :, self.target_column
                     ]
                 else:
-                    sample.values[mds.molecule].loc[:, result_column[1:]] = sample.dataset.missing_value
+                    sample.values[mds.molecule].loc[:, result_column] = sample.dataset.missing_value
                 molecules = graph.nodes.loc[mask_nodes.nonzero(), "molecule_id"].values  # type: ignore
-                prediction = prediction.detach().squeeze().numpy()
+                prediction = prediction.detach().numpy()
                 for i, c in enumerate(result_column):
                     sample.values[mds.molecule].loc[molecules, c] = prediction[:, i]
 
     @property
     def out_dim(self):
         return self.model.out_dim
-    
+
     def reset_parameters(self):
         self.model.reset_parameters()
 

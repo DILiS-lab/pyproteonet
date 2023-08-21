@@ -2,6 +2,8 @@ from typing import Optional, Union
 
 import numpy as np
 from numpy.random import Generator
+
+from .utils import get_numpy_random_generator
 from ..data.dataset import Dataset
 from ..data.dataset_sample import DatasetSample
 

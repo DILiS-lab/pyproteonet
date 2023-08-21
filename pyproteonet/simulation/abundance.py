@@ -5,6 +5,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 import scipy
 
+from .utils import get_numpy_random_generator
 from ..data.dataset_sample import DatasetSample
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
@@ -32,7 +33,7 @@ def simulate_protein_based_log_space(
     *args,
     **kwargs,
 ):
-    rng = np.random.default_rng(seed=random_seed)
+    rng = get_numpy_random_generator(seed=random_seed)
     if "protein" not in molecule_set.molecules:
         raise ValueError('Molecule set must contain key "protein".')
     if "peptide" not in molecule_set.molecules:
@@ -70,7 +71,7 @@ def simulate_protein_based_log_space(
     ] = True
 
     peptide_protein_mapping = molecule_set.get_mapped_pairs(
-        "protein", "peptide", mapping=mapping
+        molecule_a="protein", molecule_b="peptide", mapping=mapping
     )
 
     dataset = Dataset(molecule_set=molecule_set)

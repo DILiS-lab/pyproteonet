@@ -107,7 +107,7 @@ def load_alphapept_result(
         assert (groups["protein_group"].nunique() == 1).all()
         peptides["protein_group"] = groups["protein_group"].first()
 
-    prot_mapping = pd.DataFrame({"id": protein_groups.to_numpy(), "map_id": protein_groups.to_numpy()})
+    #prot_mapping = pd.DataFrame({"id": protein_groups.to_numpy(), "map_id": protein_groups.to_numpy()})
     pep_mapping = pep_prot_mapping[pep_prot_mapping["map_id"].isin(protein_to_group_mapping.index)]
     if peptide_id_field != "sequence":
         assert (groups["sequence"].nunique() == 1).all()
@@ -116,7 +116,11 @@ def load_alphapept_result(
         del pep_mapping["id"]
         pep_mapping.rename(columns={peptide_id_field: "id"}, inplace=True)
     pep_mapping = pep_mapping[pep_mapping.id.isin(peptides.index)]
-    pep_mapping.loc[:, "map_id"] = protein_to_group_mapping.loc[pep_mapping.map_id].values
+    pep_mapping.loc[:, "protein_group"] = protein_to_group_mapping.loc[pep_mapping.map_id].values
+    del pep_mapping["map_id"]
+    pep_mapping.rename(columns={'id':'peptide'}, inplace=True)
+    pep_mapping.drop_duplicates(inplace=True)
+    pep_mapping.set_index(['protein_group', 'peptide'], drop=True, inplace=True)
 
     sample_groups = protein_fdr.groupby(["sample_group", peptide_id_field])
     sample_peptides = sample_groups[[f for f in per_sample_fields if f in summed_peptide_fields]].sum()
@@ -124,10 +128,11 @@ def load_alphapept_result(
     sample_peptides[mean_fields] = sample_groups[mean_fields].mean()
 
     molecules = {"protein_group": pd.DataFrame(index=protein_groups), "peptide": peptides}
-    mappings = {"protein_group": {"protein_group": prot_mapping, "peptide": pep_mapping}}
+    mappings = {"protein_group-peptide":  pep_mapping}
     if keep_razor_mapping:
-        razor_mapping = peptides.reset_index().rename(columns={peptide_id_field: "id", "protein_group": "map_id"})
-        razor_mapping = {"protein_group": prot_mapping.copy(), "peptide": razor_mapping}
+        razor_mapping = peptides.reset_index().rename(columns={peptide_id_field: "peptide"})
+        razor_mapping.set_index(['protein_group', 'peptide'], drop=True, inplace=True)
+        #razor_mapping = {"protein_group": prot_mapping.copy(), "peptide": razor_mapping}
         mappings["razor"] = razor_mapping
     ms = MoleculeSet(molecules=molecules, mappings=mappings)
     ds = Dataset(molecule_set=ms)

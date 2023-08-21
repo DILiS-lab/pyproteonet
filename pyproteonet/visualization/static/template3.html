@@ -1,0 +1,19 @@
+Proteome Graph:
+<div id="container"></div>
+<script>
+    var graph_json = $graph_json
+    var graph = new ElGrapho({
+    container: document.getElementById('container'),
+    model: ElGrapho.layouts.ForceDirected(graph_json),
+    width: 1000,
+    debug: false,
+    nodeSize: 0.5,
+    edgeSize: 0.5,
+    darkMode: true,
+    glowBlend: 0.5,
+    nodeOutline: true
+    });
+    graph.tooltipTemplate = function(index, el) {
+        el.innerHTML = graph_json.nodes[index].tt;
+    };
+</script>
