@@ -186,7 +186,7 @@ class Dataset:
             v = sample.values[molecule][column]
             values.append(v)
             if return_missing_mask:
-                mask.append(eq_nan(v, sample.missing_abundance_value))
+                mask.append(eq_nan(v, sample.missing_value))
         values = pd.concat(values)
         if return_missing_mask:
             return values, np.concatenate(mask)
@@ -304,7 +304,7 @@ class Dataset:
             if name in matrix.keys():
                 sample.values[molecule][column] = matrix[name]
 
-    def rename_values(self, columns: Dict[str, str], molecules: Optional[List[str]] = None, inplace: bool = False):
+    def rename_columns(self, columns: Dict[str, str], molecules: Optional[List[str]] = None, inplace: bool = False):
         return rename_values(data=self, columns=columns, molecules=molecules, inplace=inplace)
 
     def drop_values(self, columns: List[str], molecules: Optional[List[str]] = None, inplace: bool = False):

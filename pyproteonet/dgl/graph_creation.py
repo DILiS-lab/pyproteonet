@@ -66,8 +66,8 @@ def populate_graph_dgl(
     node_molecule_values = dataset_sample.molecule_set.get_node_values_for_graph(graph=graph, include_id_and_type=False)
     num_nodes = dgl_graph.num_nodes("molecule")
     num_columns = num_value_columns + len(molecule_columns)
-    x = np.full((num_nodes, num_columns), dataset_sample.missing_abundance_value, dtype=np.float32)
-    target = np.full((num_nodes, 1), dataset_sample.missing_abundance_value, dtype=np.float32)
+    x = np.full((num_nodes, num_columns), dataset_sample.missing_value, dtype=np.float32)
+    target = np.full((num_nodes, 1), dataset_sample.missing_value, dtype=np.float32)
     for molecule, columns in value_columns.items():
         nodes = graph.node_mapping[molecule].loc[dataset_sample.values[molecule].index, "node_id"]
         for i, column in enumerate(columns):

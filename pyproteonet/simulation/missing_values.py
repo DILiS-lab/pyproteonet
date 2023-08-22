@@ -31,7 +31,7 @@ def simulate_mnars_thresholding_sample(
         result_column = column
     else:
         sample.values[molecule][result_column] = sample.values[molecule][column].copy()
-    sample.values[molecule].loc[mask, result_column] = sample.missing_abundance_value
+    sample.values[molecule].loc[mask, result_column] = sample.missing_value
     if mask_column is not None:
         sample.values[molecule].loc[:, mask_column] = False
         sample.values[molecule].loc[mask, mask_column] = True
@@ -94,7 +94,7 @@ def simulate_mcars_sample(
         result_column = column
     else:
         sample.values[molecule][result_column] = sample.values[molecule][column].copy()
-    sample.values[molecule].loc[mask, result_column] = sample.missing_abundance_value
+    sample.values[molecule].loc[mask, result_column] = sample.missing_value
     if mask_column is not None:
         sample.values[molecule].loc[:, mask_column] = False
         sample.values[molecule].loc[mask, mask_column] = True

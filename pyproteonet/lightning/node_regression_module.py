@@ -21,7 +21,7 @@ class NodeRegressionModule(pl.LightningModule):
         nan_substitute_value: float = 0.0,
         mask_substitute_value: float = 0.0,
         hide_substitute_value: float = 0.0,
-        lr: float = 0.02,
+        lr: float = 0.001,
     ):
         super().__init__()
         self.model = model

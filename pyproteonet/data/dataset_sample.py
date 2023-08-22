@@ -63,7 +63,7 @@ class DatasetSample:
         return self.dataset.molecule_set
 
     @property
-    def missing_abundance_value(self):
+    def missing_value(self):
         return self.dataset.missing_value
 
     @property
@@ -142,7 +142,7 @@ class DatasetSample:
         fig, ax = plt.subplots(1, len(keys))
         for i, key in enumerate(keys):
             missing_percent = (
-                eq_nan(self.values[key].abundance, self.missing_abundance_value).sum()
+                eq_nan(self.values[key].abundance, self.missing_value).sum()
                 / self.values[key].abundance.shape[0]
             )
             missing_percent *= 100

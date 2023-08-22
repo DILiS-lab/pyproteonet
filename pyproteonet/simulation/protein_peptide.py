@@ -113,7 +113,7 @@ def simulate_protein_peptide_dataset(
     )
     neighbor_sum(
         dataset,
-        input_molecule=protein_molecule,
+        molecule=protein_molecule,
         column=protein_column,
         mapping=mapping,
         result_molecule=peptide_molecule,
@@ -151,7 +151,7 @@ def simulate_protein_peptide_dataset(
     )
     if peptide_poisson_error:
         poisson_error(
-            dataset=dataset, molecule=peptide_molecule, column=peptide_column, random_seed=seeds[6], inplace=True
+            dataset=dataset, molecule=peptide_molecule, column=peptide_column, random_seed=seed, inplace=True
         )
     dataset.values[protein_molecule][protein_column] = ground_truth_prot_vals
     return dataset

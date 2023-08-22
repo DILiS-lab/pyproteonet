@@ -9,6 +9,7 @@ from lightning.pytorch.loggers import Logger
 import torch
 from torch import nn
 import lightning.pytorch as pl
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
 from ..dgl.gnn_architectures.gat import GAT
 from ..dgl.gnn_architectures.resettable_module import ResettableModule
@@ -48,17 +49,20 @@ class GnnPredictor:
                 hide_substitute_value=missing_substitute_value,
             )
         self.logger = logger
+        self.trainer = None
 
     def fit(
         self,
         train_mds: AbstractMaskedDataset,
         test_mds: Optional[AbstractMaskedDataset],
-        max_epochs: int = 10,
-        reset_parameters: bool = False,
+        early_stopping: bool = True,
+        max_epochs: int = 1000,
         silent: bool = False,
         check_val_every_n_epoch: int = 1,
+        log_every_n_steps = 50,
+        continue_training: bool = False,
     ):
-        if reset_parameters:
+        if not continue_training:
             self.reset_parameters()
         train_gds = train_mds.get_graph_dataset_dgl(
             mapping=self.mapping,
@@ -82,15 +86,26 @@ class GnnPredictor:
         #plt_log_level = ptl_logger.level
         #if silent:
         #    ptl_logger.setLevel(logging.ERROR)
-        trainer = Trainer(
-            logger=self.logger,
-            max_epochs=max_epochs,
-            enable_checkpointing=False,
-            enable_progress_bar=not silent,
-            enable_model_summary=not silent,
-            check_val_every_n_epoch=check_val_every_n_epoch,
-        )
-        trainer.fit(self.module, train_dataloaders=train_dl, val_dataloaders=val_dl)
+        callbacks = []
+        if early_stopping:
+            callbacks = [EarlyStopping(monitor="val_loss", mode="min", patience=5)]
+        if not continue_training:
+            self.trainer = Trainer(
+                logger=self.logger,
+                max_epochs=max_epochs,
+                enable_checkpointing=False,
+                enable_progress_bar=not silent,
+                enable_model_summary=not silent,
+                check_val_every_n_epoch=check_val_every_n_epoch,
+                log_every_n_steps=log_every_n_steps,
+                callbacks=callbacks
+            )
+        else:
+            if self.trainer is None:
+                raise RuntimeError("You cannot specify continue_training without call fit with continue_training=False first")
+            if self.trainer.fit_loop.epoch_progress.current.completed >= self.trainer.fit_loop.max_epochs:
+                self.trainer.fit_loop.max_epochs += max_epochs
+        self.trainer.fit(self.module, train_dataloaders=train_dl, val_dataloaders=val_dl)
         #if silent:
         #    ptl_logger.setLevel(plt_log_level)
 
@@ -126,8 +141,10 @@ class GnnPredictor:
             #plt_log_level = ptl_logger.level
             #if silent:
             #   ptl_logger.setLevel(logging.ERROR)
-            trainer = Trainer(enable_progress_bar=not silent, enable_model_summary=not silent)
-            predictions = trainer.predict(self.module, dl)
+            #trainer = Trainer(enable_progress_bar=not silent, enable_model_summary=not silent)
+            if self.trainer is None:
+                raise RuntimeError("You need to call fit first.")
+            predictions = self.trainer.predict(self.module, dl)
             #if silent:
             #    ptl_logger.setLevel(plt_log_level)
             for i, prediction in enumerate(predictions):

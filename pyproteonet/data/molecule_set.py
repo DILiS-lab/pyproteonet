@@ -2,6 +2,7 @@ from typing import Dict, Optional, List, Iterable, Union
 import uuid
 from pathlib import Path
 import warnings
+from itertools import chain
 
 import pandas as pd
 from pandas import HDFStore
@@ -31,7 +32,9 @@ class MoleculeSet:
         self.mappings = {}
         self.mappings_lookup = {}
         for mapping_name, mapping in mappings.items():
-            self.add_mapping_pairs(mapping=mapping_name, pairs=mapping)
+            self._validate_mapping(mapping)
+            self.mappings[mapping_name] = mapping
+        self._update_mapping_lookup()
         self.clear_cache()
         # self._node_mapping: Optional[Dict[str, pd.DataFrame]] = None
         # self._nodes = None
@@ -43,7 +46,11 @@ class MoleculeSet:
     #         self._nodes, self._edges, self._node_mapping = create_graph_nodes_edges(molecule_set=self, mapping=mapping, make_bidirectional=bidirectional)
     #     return self._nodes, self._edges, self._node_mapping
 
-    def _validate_mapping(self, mapping: pd.DataFrame):
+    def _validate_mapping(self, mapping: pd.DataFrame, mapping_name: Optional[str] = None):
+        assert len(mapping.index.names) == 2
+        assert all([m in self.molecules for m in mapping.index.names])
+        if mapping_name in self.molecules:
+            warnings.warn(f"Mapping '{mapping_name}' has the same name as a molecule. This can lead to ambiguity and should be avoided!")
         mol_a, mol_b = mapping.index.names
         assert mapping.index.get_level_values(mol_a).isin(self.molecules[mol_a].index).all()
         assert mapping.index.get_level_values(mol_b).isin(self.molecules[mol_b].index).all()
@@ -161,6 +168,24 @@ class MoleculeSet:
             raise NotImplementedError()
         self.molecules[molecule][column] = data
 
+    def rename_molecule(self, molecule: str, new_name: str):
+        if new_name in self.molecules:
+            raise KeyError(f"Key {new_name} already exists.")
+        self.molecules[new_name] = self.molecules[molecule]
+        affected_mappings = list(chain(*self.mappings_lookup[molecule].values()))
+        for m in affected_mappings:
+            m = self.mappings[m]
+            m.index.rename(level=molecule, names=new_name, inplace=True)
+        del self.molecules[molecule]
+        self._update_mapping_lookup()
+
+    def rename_mapping(self, mapping: str, new_name: str):
+        if new_name in self.mappings:
+            raise KeyError(f"Key {new_name} already exists.")
+        self.mappings[new_name] = self.mappings[mapping]
+        del self.mappings[mapping]
+        self._update_mapping_lookup()
+
     def rename_molecule_data(self, columns: Dict[str, str], molecule: Optional[str] = None, inplace: bool = True):
         if inplace == False:
             raise NotImplementedError()
@@ -169,7 +194,7 @@ class MoleculeSet:
         else:
             molecules = [molecule]
         for molecule in molecules:
-            self.molecules[molecule].rename(columns=columns)
+            self.molecules[molecule].rename(columns=columns, inplace=True)
 
     def drop_molecule_data(self, columns: List[str], molecule: Optional[str] = None, inplace: bool = True):
         if inplace == False:
@@ -191,24 +216,22 @@ class MoleculeSet:
             self.molecules[molecule] = pd.concat([self.molecules[molecule], df])
         self.clear_cache()
 
-    def _add_mapping_lookup(self, mapping_name: str, mapping_df: pd.DataFrame):
-        if mapping_name in self.molecules:
-            warnings.warn(f"Mapping '{mapping_name}' has the same name as a molecule. This can lead to ambiguity and should be avoided!")
-        molecules = mapping_df.index.names
-        assert len(molecules) == 2
-        lookup = self.mappings_lookup.get(molecules[0], dict())
-        lookup[molecules[1]] = lookup.get(molecules[1], []) + [mapping_name]
-        self.mappings_lookup[molecules[0]] = lookup
-        lookup = self.mappings_lookup.get(molecules[1], dict())
-        lookup[molecules[0]] = lookup.get(molecules[0], []) + [mapping_name]
-        self.mappings_lookup[molecules[1]] = lookup
+    def _update_mapping_lookup(self):
+        self.mappings_lookup = {}
+        for mapping_name, mapping_df in self.mappings.items():
+            molecules = mapping_df.index.names
+            lookup = self.mappings_lookup.get(molecules[0], dict())
+            lookup[molecules[1]] = lookup.get(molecules[1], []) + [mapping_name]
+            self.mappings_lookup[molecules[0]] = lookup
+            lookup = self.mappings_lookup.get(molecules[1], dict())
+            lookup[molecules[0]] = lookup.get(molecules[0], []) + [mapping_name]
+            self.mappings_lookup[molecules[1]] = lookup
 
     def add_mapping_pairs(self, mapping: str, pairs: pd.DataFrame):
         if mapping not in self.mappings:
-            assert all([m in self.molecules for m in pairs.index.names])
-            self._validate_mapping(pairs)
-            self._add_mapping_lookup(mapping_name=mapping, mapping_df=pairs)
+            self._validate_mapping(mapping=pairs, mapping_name=mapping)
             self.mappings[mapping] = pairs
+            self._update_mapping_lookup()
         else:
             mols = self.mappings[mapping].index.names
             if set(mols) != set(pairs.index.names):
@@ -216,7 +239,7 @@ class MoleculeSet:
             if mols != pairs.index.names:
                 pairs = pairs.swaplevel()
             new_mapping = pd.concat([self.mappings[mapping], pairs])
-            self._validate_mapping(new_mapping)
+            self._validate_mapping(mapping=new_mapping, mapping_name=mapping)
             self.mappings[mapping] = new_mapping
         self.clear_cache()
 

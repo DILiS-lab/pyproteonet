@@ -1,10 +1,10 @@
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 
 import numpy as np
 import lightning.pytorch as pl
 
 from ..data.dataset import Dataset
-from ..predictors.gnn_predictor import GnnPredictor
+from ..predictors.gnn import GnnPredictor
 from ..processing.masking import train_test_non_missing_no_overlap_iterable, mask_missing
 from ..dgl.gnn_architectures.gat import GAT
 from ..lightning.console_logger import ConsoleLogger
@@ -18,12 +18,14 @@ def gnn_impute(
     result_column: str = "gnnimp",
     partner_molecule: Optional[str] = None,
     partner_column: Optional[str] = None,
+    molecule_columns: List[str] = [],
     train_frac: float = 0.1,
     test_frac: float = 0.2,
     module: Optional[pl.LightningModule] = None,
     model: Callable = GAT(in_dim=3, hidden_dim=40, out_dim=1, num_heads=20),
     missing_substitute_value: float = 0.0,
-    max_epochs: int = 20,
+    early_stopping: bool = True,
+    max_epochs: int = 1000,
     inplace: bool = True,
     check_val_every_n_epoch: int = 1,
     silent: bool = False,
@@ -58,7 +60,7 @@ def gnn_impute(
     gnn_predictor = GnnPredictor(
         mapping=mapping,
         value_columns=["gnninput"],
-        molecule_columns=[],
+        molecule_columns=molecule_columns,
         target_column="gnninput",
         module=module,
         model=model,
@@ -70,6 +72,7 @@ def gnn_impute(
         train_mds=train_mds,
         test_mds=test_mds,
         max_epochs=max_epochs,
+        early_stopping=early_stopping,
         silent=silent,
         check_val_every_n_epoch=check_val_every_n_epoch,
     )

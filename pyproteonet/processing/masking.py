@@ -47,7 +47,7 @@ def train_test_non_missing_no_overlap_iterable(
 
     Args:
         dataset (Dataset): _description_
-        train_frac (float, optional): Train set size relative to number of non-missing values within a sample. Defaults to 0.1.
+        train_frac (float, optional): Train set size relative to number of non-missing values of non-test molecules within a sample. Defaults to 0.1.
         test_frac (float, optional): Test set size relative to number of molecules. Defaults to 0.1.
         molecule (str, optional): Molecule type to use. Defaults to "protein".
         column (str, optional): Value column to use. Defaults to "abundance".
@@ -56,7 +56,6 @@ def train_test_non_missing_no_overlap_iterable(
     Returns:
         Tuple[MaskedDatasetIterable, MaskedDatasetIterable]: Tuple of train and test iterable datasets.
     """    
-    assert train_frac + test_frac <= 1.0
     test_molecules = dataset.molecule_set.molecules[molecule].sample(frac=test_frac, random_state=random_seed).index
 
     def sample_train(sample: DatasetSample):
