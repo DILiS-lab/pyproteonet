@@ -13,13 +13,15 @@ from ..data.masks import DatasetSampleMask
 
 
 def mask_molecule(
-    dataset: Dataset, mask: Union[pd.Index, List, np.ndarray], molecule: str = "protein"
+    dataset: Dataset, molecule: str, ids: Optional[Union[pd.Index, List, np.ndarray]] = None
 ) -> MaskedDataset:
-    mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
+    mds = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
+    if ids is None:
+        ids = dataset.molecule_set.molecules[molecule].index
     for sample_name, sample in dataset.samples_dict.items():
-        mask[sample_name] = False
-        mask.loc[mask, sample_name] = True
-    return MaskedDataset(dataset=dataset, mask=mask, molecule=molecule)
+        mds[sample_name] = False
+        mds.loc[ids, sample_name] = True
+    return MaskedDataset(dataset=dataset, mask=mds, molecule=molecule)
 
 def mask_missing(
     dataset: Dataset, molecule: str = "protein", column: str = 'abundance',

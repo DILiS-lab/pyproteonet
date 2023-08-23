@@ -1,6 +1,7 @@
-from typing import Union, Dict, List, TYPE_CHECKING, Optional, Tuple
+from typing import Union, Dict, List, TYPE_CHECKING, Optional, Tuple, Iterable
 from pathlib import Path
 import logging
+import collections
 
 import numpy as np
 from dgl.dataloading import GraphDataLoader
@@ -54,14 +55,21 @@ class GnnPredictor:
     def fit(
         self,
         train_mds: AbstractMaskedDataset,
-        test_mds: Optional[AbstractMaskedDataset],
+        test_mds: Optional[Union[AbstractMaskedDataset, Iterable[AbstractMaskedDataset]]],
         early_stopping: bool = True,
         max_epochs: int = 1000,
         silent: bool = False,
         check_val_every_n_epoch: int = 1,
-        log_every_n_steps = 50,
+        log_every_n_epochs = 1,
         continue_training: bool = False,
+        eval_target_columns: Optional[Union[str, Iterable[str]]] = None,
+        early_stopping_patience: int = 5,
     ):
+        if eval_target_columns is None:
+            eval_target_columns = [self.target_column]
+        else:
+            if not isinstance(eval_target_columns, collections.abc.Iterable):
+                eval_target_columns = [eval_target_columns]
         if not continue_training:
             self.reset_parameters()
         train_gds = train_mds.get_graph_dataset_dgl(
@@ -74,21 +82,27 @@ class GnnPredictor:
         train_dl = GraphDataLoader(train_gds, batch_size=1)  # TODO: think about batch size
         val_dl = None
         if test_mds is not None:
-            test_gds = test_mds.get_graph_dataset_dgl(
-                mapping=self.mapping,
-                value_columns=self.value_columns,
-                molecule_columns=self.molecule_columns,
-                target_column=self.target_column,
-                missing_column_value=self.missing_substitute_value,
-            )
-            val_dl = GraphDataLoader(test_gds, batch_size=1)
+            val_dl = []
+            if not isinstance(test_mds, (list, tuple)):
+                test_mds = [test_mds]
+            if len(test_mds) != len(eval_target_columns):
+                raise AttributeError("The number of validation datasets has to equal to the number of validation target columns.")
+            for mds, eval_target in zip(test_mds, eval_target_columns):
+                test_gds = mds.get_graph_dataset_dgl(
+                    mapping=self.mapping,
+                    value_columns=self.value_columns,
+                    molecule_columns=self.molecule_columns,
+                    target_column=eval_target,
+                    missing_column_value=self.missing_substitute_value,
+                )
+                val_dl.append(GraphDataLoader(test_gds, batch_size=1))
         #ptl_logger = logging.getLogger("lightning.pytorch")
         #plt_log_level = ptl_logger.level
         #if silent:
         #    ptl_logger.setLevel(logging.ERROR)
         callbacks = []
         if early_stopping:
-            callbacks = [EarlyStopping(monitor="val_loss", mode="min", patience=5)]
+            callbacks = [EarlyStopping(monitor="validation_loss", mode="min", patience=early_stopping_patience)]
         if not continue_training:
             self.trainer = Trainer(
                 logger=self.logger,
@@ -97,7 +111,7 @@ class GnnPredictor:
                 enable_progress_bar=not silent,
                 enable_model_summary=not silent,
                 check_val_every_n_epoch=check_val_every_n_epoch,
-                log_every_n_steps=log_every_n_steps,
+                log_every_n_steps=len(train_gds) * log_every_n_epochs,
                 callbacks=callbacks
             )
         else:

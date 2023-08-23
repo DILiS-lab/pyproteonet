@@ -60,14 +60,17 @@ def populate_graph_dgl(
     all_value_columns = []
     for vcs in value_columns.values():
         all_value_columns.extend(vcs)
-    if target_column not in molecule_columns and target_column not in all_value_columns:
-        raise ValueError("neither any value column nor any molecule column equals the target column!")
     num_value_columns = max([len(columns) for _, columns in value_columns.items()])
     node_molecule_values = dataset_sample.molecule_set.get_node_values_for_graph(graph=graph, include_id_and_type=False)
     num_nodes = dgl_graph.num_nodes("molecule")
     num_columns = num_value_columns + len(molecule_columns)
     x = np.full((num_nodes, num_columns), dataset_sample.missing_value, dtype=np.float32)
     target = np.full((num_nodes, 1), dataset_sample.missing_value, dtype=np.float32)
+    if target_column not in all_value_columns:
+        target_not_in_values = True
+        value_columns = {mol:cols + [target_column] for mol,cols in value_columns.items()}
+    else:
+        target_not_in_values = False
     for molecule, columns in value_columns.items():
         nodes = graph.node_mapping[molecule].loc[dataset_sample.values[molecule].index, "node_id"]
         for i, column in enumerate(columns):
@@ -88,20 +91,15 @@ def populate_graph_dgl(
                             + " please set the missing_column_value arguement."
                         )
                     )
-            x[nodes, i] = values
             if column == target_column:
-                target[nodes, i] = values
-    # for molecule, columns in value_columns.item():
-    #     x[node_values.index, i] = node_values[column].to_numpy().astype(np.float32)
-    #     if column == target_column:
-    #         target[node_values.index, i] = node_values[column].to_numpy().astype(np.float32)
-    #     i += 1
+                target[nodes, 0] = values
+                if target_not_in_values:
+                    continue
+            x[nodes, i] = values
     for i, column in enumerate(molecule_columns):
         i = i + num_value_columns
         values = node_molecule_values[column].to_numpy().astype(np.float32)
         x[node_molecule_values.index, i] = values
-        if column == target_column:
-            target[node_molecule_values.index, i] = values
         i += 1
     nodes_data = graph.nodes.loc[:, "type"]  # type: ignore
     # nodes_data[node_values.columns] = node_values
