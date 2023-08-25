@@ -12,9 +12,9 @@ from ..lightning.console_logger import ConsoleLogger
 
 def gnn_impute(
     dataset: Dataset,
-    molecule: str = "peptide",
-    column: str = "normalized",
-    mapping: str = "protein_group",
+    molecule: str,
+    column: str,
+    mapping: str,
     result_column: str = "gnnimp",
     partner_molecule: Optional[str] = None,
     partner_column: Optional[str] = None,
@@ -51,7 +51,7 @@ def gnn_impute(
         gnnds.values[partner_molecule]["gnninput"] = (vals - partner_mean) / partner_std
 
     train_mds, test_mds = train_test_non_missing_no_overlap_iterable(
-        dataset=gnnds, train_frac=train_frac, test_frac=test_frac, molecule=molecule, column="gnninput"
+        dataset=gnnds, train_frac=train_frac, test_frac=test_frac, molecule=molecule, non_missing_column="gnninput"
     )
     if silent:
         logger = None

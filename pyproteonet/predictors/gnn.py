@@ -64,6 +64,7 @@ class GnnPredictor:
         continue_training: bool = False,
         eval_target_columns: Optional[Union[str, Iterable[str]]] = None,
         early_stopping_patience: int = 5,
+        early_stopping_mds_index: Optional[int] = None,
     ):
         if eval_target_columns is None:
             eval_target_columns = [self.target_column]
@@ -102,7 +103,12 @@ class GnnPredictor:
         #    ptl_logger.setLevel(logging.ERROR)
         callbacks = []
         if early_stopping:
-            callbacks = [EarlyStopping(monitor="validation_loss", mode="min", patience=early_stopping_patience)]
+            monitor = "validation_loss"
+            if len(test_mds) > 1:
+                if early_stopping_mds_index is None:
+                    raise AttributeError("You have to specify the early_stopping_mds_index if specifying more than one evaluation masked dataset")
+                monitor = f"validation_loss/dataloader_idx_{early_stopping_mds_index}"
+            callbacks = [EarlyStopping(monitor=monitor, mode="min", patience=early_stopping_patience)]
         if not continue_training:
             self.trainer = Trainer(
                 logger=self.logger,

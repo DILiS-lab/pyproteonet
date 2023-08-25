@@ -12,25 +12,31 @@ def per_sample_correlation(
     molecule: str,
     column: str,
     ground_truth_column: str,
-    ignore_ground_truth_missing_values: bool = False,
-    ground_truth_molecules: Optional[List] = None,
+    ignore_missing: bool = False,
+    ids: Optional[pd.Index] = None,
     logarithmize: bool = True,
     correlation_measure: Callable = pearsonr,
 ) -> Dict[str, float]:
     res = {}
-    if ground_truth_molecules is not None:
-        ground_truth_molecules = pd.Series(ground_truth_molecules)
+    if 'sample' in ids.names:
+        second_index = [n for n in ids.names if n!='sample']
+        assert len(second_index) == 1
+        second_index = second_index[0]
+        ids = {sample:ids[second_index] for sample,ids in ids.to_frame().reset_index(drop=True).groupby('sample')}
+    else:
+        ids = {sample:ids for sample in dataset.sample_names}
     for sample_name, sample in dataset.samples_dict.items():
-        mask = sample.non_missing_mask(molecule=molecule, column=column)
-        if ignore_ground_truth_missing_values:
-            mask = mask & sample.non_missing_mask(molecule=molecule, column=ground_truth_column)
-        values = sample.values[molecule].loc[mask, column]
-        gt = sample.values[molecule].loc[mask, ground_truth_column]
-        if ground_truth_molecules is not None:
-            sample_gt_mols = ground_truth_molecules.isin(gt.index)
-            sample_gt_mols = ground_truth_molecules.loc[sample_gt_mols]
-            values = values.loc[sample_gt_mols]
-            gt = gt.loc[sample_gt_mols]
+        values = sample.values[molecule][column]
+        gt = sample.values[molecule][ground_truth_column]
+        if ignore_missing:
+            df = sample.values
+            mask = (~df[column].isna()) & (~df[ground_truth_column].isna())
+            values = values.loc[mask]
+            gt = gt.loc[mask]
+        if ids is not None:
+            sample_ids = ids[sample_name].loc[ids[sample_name].isin(gt.index)]
+            values = values.loc[sample_ids]
+            gt = gt.loc[sample_ids]
         if logarithmize:
             values, gt = np.log(values), np.log(gt)
         r, p = correlation_measure(gt, values)

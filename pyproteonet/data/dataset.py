@@ -204,13 +204,17 @@ class Dataset:
         df.set_index(index, inplace=True)
         return df
     
-    def get_mapped(self, molecule: str, partner_molecule: str, mapping: str, columns: List[str],
+    def get_mapped(self, molecule: str, mapping: str, partner_molecule: str = None, columns: List[str] = [],
                    samples: Optional[List] = None, columns_partner: List[str] = [],
                    molecule_columns:  List[str] = [], molecule_columns_partner: List[str] = [])->pd.DataFrame:
-        if not columns:
-            raise AttributeError("The list of columns needs to contain at least one column!")
+        #if not columns:
+        #    raise AttributeError("The list of columns needs to contain at least one column!")
         mapped = self.molecule_set.get_mapped(molecule=molecule, partner_molecule=partner_molecule, mapping=mapping,
                                               molecule_columns=molecule_columns, molecule_columns_partner=molecule_columns_partner)
+        if partner_molecule is None:
+            partner_molecule = [n for n in mapped.index.names if n not in {'sample', molecule}]
+            assert len(partner_molecule) == 1
+            partner_molecule = partner_molecule[0]
         cols = set(mapped.columns)
         if samples is None:
             samples = self.sample_names
@@ -232,8 +236,7 @@ class Dataset:
             if columns_partner:
                 partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), columns_partner]
                 for pc in partner_vals:
-                    print(pc.name)
-                    vals[pc.name] = pc.values
+                    vals[pc] = partner_vals[pc].values
             vals = pd.concat([vals], keys=[sample], names=['sample'])
             res.append(vals)
         return pd.concat(res)

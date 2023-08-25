@@ -34,6 +34,7 @@ def simulate_protein_peptide_dataset(
     protein_molecule: str = "protein",
     peptide_molecule: str = "peptide",
     random_seed: Optional[Union[int, np.random.Generator]] = None,
+    print_parameters: bool = False,
 ) -> Dataset:
     """High-level wrapper for the simulation of a protein-pepide dataset wrapping multiple simulation steps.
 
@@ -80,6 +81,16 @@ def simulate_protein_peptide_dataset(
     """    
     #Use different seeds for different step because otherwise the exact same values are drawn in multiple steps which can lead to
     # strange effects (e.g. the product of two normal draws would always be positive because the same value is drawn twice). 
+    if print_parameters:
+        print(f"Protein distribution: mean(log_e)={log_abundance_mu}, std(log_e)={log_abundance_sigma}")
+        print(f"Protein error std (log_e):{log_protein_error_sigma}")
+        print(f"Flyability: {simulate_flyability}")
+        if simulate_flyability:
+            print(f"Flyability: alpha:{flyability_alpha}, beta:{flyability_beta}")
+        print(f"Petide poisson errror: {peptide_poisson_error}")
+        print(f"Peptide noise: mu(log_e):{peptide_noise_mu}, sigma(log_e):{peptide_noise_sigma}")
+        print(f"Condition_samples:{condition_samples}, condition_affeced:{condition_affected},")
+        print(f"condition_means(log2):{log2_condition_means}, condition_sigmas(log2){log2_condition_stds}")
     seed = get_numpy_random_generator(seed=random_seed)
     dataset = draw_normal_log_space(
         molecule_set=molecule_set,

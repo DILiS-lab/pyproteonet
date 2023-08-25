@@ -23,6 +23,25 @@ def mask_molecule(
         mds.loc[ids, sample_name] = True
     return MaskedDataset(dataset=dataset, mask=mds, molecule=molecule)
 
+def mask_molecule_iterable(dataset: Dataset, molecule: str, frac: Optional[float] = None, ids: Optional[Union[pd.Index, List, np.ndarray]] = None,
+                           hidden_ids: Optional[Union[pd.Index, List, np.ndarray]] = None,
+                           non_missing_column: Optional[str] = None, random_seed: Optional[int] = None)-> MaskedDatasetIterable:
+    if ids is not None:
+        molecules = ids
+    else:
+        molecules = dataset.molecules[molecule].index
+    def sample(sample: DatasetSample):
+        vals = sample.values[molecule]
+        vals = vals[vals.index.isin(molecules)]
+        if non_missing_column is not None:
+            vals = vals.loc[~vals[non_missing_column].isna()]
+        if frac is not None:
+            sampled_molecules = vals.sample(frac=frac, random_state=random_seed).index
+        else:
+            sampled_molecules = vals.index
+        return DatasetSampleMask(sample=sample, molecule=molecule, masked=sampled_molecules, hidden=hidden_ids)
+    MaskedDatasetIterable(dataset=dataset, mask_function=sample, molecule=molecule, has_hidden=hidden_ids is not None)
+
 def mask_missing(
     dataset: Dataset, molecule: str = "protein", column: str = 'abundance',
 ) -> MaskedDataset:
@@ -37,7 +56,8 @@ def train_test_non_missing_no_overlap_iterable(
     train_frac: float = 0.1,
     test_frac: float = 0.1,
     molecule: str = "protein",
-    column: str = "abundance",
+    non_missing_column: str = "abundance",
+    ids: Optional[Union[pd.Index, List, np.ndarray]] = None, 
     random_seed: Optional[int] = None,
 ) -> Tuple[MaskedDatasetIterable, MaskedDatasetIterable]:
     """Generates an iterable dataset with random, non-missing train molecules and a fixed set of test molecules.
@@ -52,22 +72,28 @@ def train_test_non_missing_no_overlap_iterable(
         train_frac (float, optional): Train set size relative to number of non-missing values of non-test molecules within a sample. Defaults to 0.1.
         test_frac (float, optional): Test set size relative to number of molecules. Defaults to 0.1.
         molecule (str, optional): Molecule type to use. Defaults to "protein".
-        column (str, optional): Value column to use. Defaults to "abundance".
+        non_missing_column (str, optional): Value column to use. Defaults to "abundance".
+        ids (Union[pd.Index, List, np.ndarray], optional): If given restricts train and test set to those molecule ids. Defaults to None.
         random_seed (Optional[int], optional): Random state for random draws of train/test sets. Defaults to None.
 
     Returns:
         Tuple[MaskedDatasetIterable, MaskedDatasetIterable]: Tuple of train and test iterable datasets.
     """    
-    test_molecules = dataset.molecule_set.molecules[molecule].sample(frac=test_frac, random_state=random_seed).index
+    available_molecules = dataset.molecules[molecule]
+    if ids is not None:
+        available_molecules = available_molecules.loc[ids]
+
+    test_molecules = available_molecules.sample(frac=test_frac, random_state=random_seed).index
+    overall_train_molecules = available_molecules[~available_molecules.index.isin(test_molecules)].index
 
     def sample_train(sample: DatasetSample):
-        vals: pd.Series = sample.values[molecule][column][sample.non_missing_mask(molecule=molecule, column=column)]
-        vals = vals[~vals.index.isin(test_molecules)]
+        vals: pd.Series = sample.values[molecule].loc[overall_train_molecules, non_missing_column]
+        vals = vals[~vals.isna()]
         train_molecules = vals.sample(frac=train_frac, random_state=random_seed).index
         return DatasetSampleMask(sample=sample, molecule=molecule, masked=train_molecules, hidden=test_molecules)
 
     def sample_test(sample: DatasetSample):
-        vals: pd.Series = sample.values[molecule][column][sample.non_missing_mask(molecule=molecule, column=column)]
+        vals: pd.Series = sample.values[molecule][non_missing_column][sample.non_missing_mask(molecule=molecule, column=non_missing_column)]
         vals = vals[vals.index.isin(test_molecules)]
         return DatasetSampleMask(sample=sample, molecule=molecule, masked=vals.index)
 

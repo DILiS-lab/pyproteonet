@@ -26,11 +26,11 @@ def generic_fancy_impute(
     missing_mask = eq_nan(matrix_vals, dataset.missing_value)
     matrix_vals[missing_mask] = 0
     matrix_imputed = imputer.solve(matrix_vals, missing_mask=missing_mask)
-    matrix_imputed = pd.DataFrame(matrix_imputed, columns=matrix.columns)
+    matrix_imputed = pd.DataFrame(matrix_imputed, columns=matrix.columns, index=matrix.index)
     dataset.set_samples_value_matrix(matrix=matrix_imputed, molecule=molecule, column=result_column)
     return dataset
 
-def iterative_svd_imputation(
+def iterative_svd_impute(
     dataset: Dataset, molecule: str, column: str, result_column: Optional[str] = None, inplace: bool = False, **kwargs
 ) -> Dataset:
     imputer = IterativeSVD(**kwargs)
