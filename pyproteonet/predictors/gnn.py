@@ -28,7 +28,7 @@ class GnnPredictor:
         target_column: str = "abundance",
         module: Optional[pl.LightningModule] = None,
         model: ResettableModule = GAT(in_dim=4, hidden_dim=40, out_dim=1, num_heads=20),
-        missing_substitute_value: float = 00,
+        missing_substitute_value: float = 0,
         bidirectional_graph: bool = True,
         logger: Logger = ConsoleLogger(),  # type: ignore
     ):

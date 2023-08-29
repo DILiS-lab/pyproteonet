@@ -42,9 +42,9 @@ def knn_impute(
     return dataset
 
 def iterative_svd_impute(
-    dataset: Dataset, molecule: str, column: str, result_column: Optional[str] = None, inplace: bool = False, **kwargs
+    dataset: Dataset, molecule: str, column: str, result_column: Optional[str] = None, inplace: bool = False, min_value=0.001, **kwargs
 ) -> Dataset:
-    imputer = IterativeImputer(missing_values=dataset.missing_value, keep_empty_features=False, min_value=0, **kwargs)
+    imputer = IterativeImputer(missing_values=dataset.missing_value, keep_empty_features=False, min_value=min_value, **kwargs)
     dataset = generic_matrix_imputation(
         dataset=dataset,
         molecule=molecule,

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def apply(data: Union["DatasetSample", "Dataset"], dataset_fn: Callable, *args, **kwargs):
-    return data.apply(dataset_fn, *args, **kwargs)
+    return data.sample_apply(dataset_fn, *args, **kwargs)
 
 
 def _normalize(ds: "DatasetSample", molecules: Optional[Iterable[str]] = None, columns: Optional[List[str]] = None):
@@ -33,7 +33,7 @@ def normalize(
     molecules: Optional[Iterable[str]] = None,
     columns: Optional[Iterable[str]] = None,
 ):
-    return data.apply(_normalize, molecules=molecules, columns=columns)
+    return data.sample_apply(_normalize, molecules=molecules, columns=columns)
 
 
 def _logarithmize(

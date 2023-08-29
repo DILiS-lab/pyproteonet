@@ -111,6 +111,20 @@ class MoleculeSet:
         mapping = mapping.reset_index(drop=False)  # TODO: don't do this once everything is refactored
         return mapping
 
+    def _infer_mapping(self, molecule: str, mapping: str)->str:
+        if mapping not in self.mappings and molecule is not None:
+            mapping = self.mappings_lookup[molecule][mapping]
+            if len(mapping) != 1:
+                raise AttributeError(f"No mapping could be inferred between {molecule} and {mapping}. Please specify a mapping name!")
+            mapping = mapping[0]
+        return mapping
+    
+    def get_mapping_partner(self, molecule: str, mapping: str)->str:
+        mapping = self.mappings[self._infer_mapping(molecule=molecule, mapping=mapping)]
+        partner = [n for n in mapping.index.names if n!= molecule]
+        assert len(partner) == 1
+        return partner[0]
+    
     def get_mapped(
         self,
         mapping: str,
@@ -119,11 +133,7 @@ class MoleculeSet:
         molecule_columns_partner: List[str] = [],
         partner_molecule: str = None,
     ):
-        if mapping not in self.mappings and molecule is not None:
-            mapping = self.mappings_lookup[molecule][mapping]
-            if len(mapping) != 1:
-                raise AttributeError(f"No mapping could be inferred between {molecule} and {mapping}. Please specify a mapping name!")
-            mapping = mapping[0]
+        mapping = self._infer_mapping(molecule=molecule, mapping=mapping)
         mapped = self.mappings[mapping].copy()
         if molecule is not None:
             partner = [n for n in mapped.index.names if n!= molecule]

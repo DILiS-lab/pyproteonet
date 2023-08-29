@@ -3,6 +3,7 @@ from typing import Optional, Union
 import numpy as np
 import scipy
 
+from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
 from ..quantification.flyability import estimate_flyability_upper_bound
 from .protein_peptide import simulate_protein_peptide_dataset
@@ -49,17 +50,21 @@ class ProteinPeptideDatasetMocker:
 
     def create_mocked_dataset(
         self,
+        molecule_set: Optional[MoleculeSet] = None,
         samples: int = None,
         simulate_missing: bool = True,
         random_seed: Optional[Union[int, np.random.Generator]] = None,
         noise_mnar_thresh_multiplier: float = 2,
         noise_mnar_thresh_std_multiplier: float = 1,
+        mcar_frac: Optional[float] = None
     ) -> Dataset:
         random_seed = get_numpy_random_generator(random_seed)
         if samples is None:
             samples = len(self.dataset.samples_dict)
+        if molecule_set is None:
+            molecule_set = self.dataset.molecule_set
         sim_ds = simulate_protein_peptide_dataset(
-            molecule_set=self.dataset.molecule_set,
+            molecule_set=molecule_set,
             samples=samples,
             log_abundance_mu=self.log_abundance_mean,
             log_abundance_sigma=self.log_abundance_std,
@@ -89,19 +94,23 @@ class ProteinPeptideDatasetMocker:
             )
             pep_abs = sim_ds.values[self.peptide_molecule]["abundance"]
             mnar_missingness = pep_abs.isna().sum() / pep_abs.shape[0]
-            if mnar_missingness > self.missingness:
-                raise ValueError(
-                    "MNAR missingness after MNAR threshold estimation already higher than overall missingness. "
-                    "Missing value parameters cannot be estimated. Try specifying a different mnar_thresh multiplyer"
-                )
             print(f"MNAR missingness: {mnar_missingness}")
+            if mcar_frac is None:
+                if mnar_missingness > self.missingness:
+                    raise ValueError(
+                        "MNAR missingness after MNAR threshold estimation already higher than overall missingness. "
+                        "Missing value parameters cannot be estimated. Try specifying a different mnar_thresh multiplyer"
+                    )
+                mcar_frac = self.missingness - mnar_missingness
+            print(f"MCAR fraction: {mcar_frac}")
             simulate_mcars(
                 dataset=sim_ds,
-                amount=self.missingness - mnar_missingness,
+                amount=mcar_frac,
                 rng=random_seed,
                 molecule="peptide",
                 column="abundance",
                 inplace=True,
                 mask_column='is_mcar',
+                mask_only_non_missing = False,
             )
         return sim_ds

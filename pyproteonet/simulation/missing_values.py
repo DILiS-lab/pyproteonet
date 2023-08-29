@@ -54,7 +54,7 @@ def simulate_mnars_thresholding(
         rng = np.random.default_rng()
     if not inplace:
         dataset = dataset.copy()
-    return dataset.apply(
+    return dataset.sample_apply(
         fn=simulate_mnars_thresholding_sample,
         thresh_mean=thresh_mu,
         thresh_std=thresh_sigma,
@@ -74,6 +74,7 @@ def simulate_mcars_sample(
     column: str = "abundance",
     result_column: Optional[str] = None,
     mask_column: Optional[str] = None,
+    mask_only_non_missing: bool = True, 
     rng: Optional[Generator] = None,
 ):
     if rng is None:
@@ -87,7 +88,10 @@ def simulate_mcars_sample(
     num_vals = mask.sum()
     if amount > num_vals:
         raise ValueError(f"Only {num_vals} non missing values are in the sample but {amount} MCARS were requests!")
-    mcar_mask = rng.choice(np.nonzero(mask)[0], size=amount, replace=False)
+    if mask_only_non_missing:
+        mcar_mask = rng.choice(np.nonzero(mask)[0], size=amount, replace=False)
+    else:
+        mcar_mask = rng.choice(mask.shape[0], size=amount, replace=False)
     mask[:] = False
     mask[mcar_mask] = True
     if result_column is None:
@@ -109,19 +113,21 @@ def simulate_mcars(
     result_column: Optional[str] = None,
     mask_column: Optional[str] = None,
     rng: Optional[Generator] = None,
+    mask_only_non_missing: bool = True, 
     inplace: bool = False,
 ):
     if rng is None:
         rng = np.random.default_rng()
     if not inplace:
         dataset = dataset.copy()
-    return dataset.apply(
+    return dataset.sample_apply(
         simulate_mcars_sample,
         amount=amount,
         molecule=molecule,
         column=column,
         result_column=result_column,
         mask_column=mask_column,
+        mask_only_non_missing=mask_only_non_missing,
         rng=rng,
     )
 
@@ -173,7 +179,7 @@ def simulate_mnars_mcars_lazar(
     dataset.missing_value = missing_value
     if not inplace:
         dataset = dataset.copy()
-    return dataset.apply(
+    return dataset.sample_apply(
         fn=simulate_mnars_mcars_lazar_sample,
         alpha=alpha,
         beta=beta,

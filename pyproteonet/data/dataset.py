@@ -158,14 +158,14 @@ class Dataset:
     def __iter__(self) -> Iterable:
         return self.samples
 
-    def apply(self, fn: Callable, *args, **kwargs):
+    def sample_apply(self, fn: Callable, *args, **kwargs):
         transformed = {}
         for key, sample in self.samples_dict.items():
             transformed[key] = fn(sample, *args, **kwargs)
         return Dataset(molecule_set=self.molecule_set, samples=transformed)
 
     def copy(
-        self, samples: Optional[List[str]] = None, columns: Optional[List[str]] = None, copy_molecule_set: bool = False
+        self, samples: Optional[List[str]] = None, columns: Optional[List[str]] = None, copy_molecule_set: bool = True
     ):
         copied = {}
         samples_dict = self.samples_dict
@@ -192,10 +192,13 @@ class Dataset:
             return values, np.concatenate(mask)
         return values
 
-    def get_values_flat(self, molecule: str):
+    def get_values_flat(self, molecule: str, columns: Optional[List[str]] = None):
         sample_names, df = [], []
         for name, sample in self.samples_dict.items():
-            values = sample.values[molecule]
+            if columns is None:
+                values = sample.values[molecule]
+            else:
+                values = sample.values[molecule][columns]
             sample_names.extend(np.full(len(values), name))
             df.append(values)
         df = pd.concat(df)
@@ -204,9 +207,13 @@ class Dataset:
         df.set_index(index, inplace=True)
         return df
     
+    def get_mapping_partner(self, molecule: str, mapping: str)->str:
+        return self.molecule_set.get_mapping_partner(molecule=molecule, mapping=mapping)
+    
     def get_mapped(self, molecule: str, mapping: str, partner_molecule: str = None, columns: List[str] = [],
-                   samples: Optional[List] = None, columns_partner: List[str] = [],
-                   molecule_columns:  List[str] = [], molecule_columns_partner: List[str] = [])->pd.DataFrame:
+                   samples: Optional[List] = None, partner_columns: List[str] = [],
+                   molecule_columns:  List[str] = [], molecule_columns_partner: List[str] = [],
+                   return_partner_index_name: bool = False)->Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
         #if not columns:
         #    raise AttributeError("The list of columns needs to contain at least one column!")
         mapped = self.molecule_set.get_mapped(molecule=molecule, partner_molecule=partner_molecule, mapping=mapping,
@@ -227,19 +234,23 @@ class Dataset:
         if cols.intersection(columns):
             raise AttributeError("Result would have duplicated column names!")
         cols.update(columns)
-        if cols.intersection(columns_partner):
+        if cols.intersection(partner_columns):
             raise AttributeError("Result would have duplicated column names!")
         res = []
         for sample, map in sample_maps.items():
             vals = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(molecule), columns]
             vals.set_index(map.index, inplace=True)
-            if columns_partner:
-                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), columns_partner]
+            if partner_columns:
+                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), partner_columns]
                 for pc in partner_vals:
                     vals[pc] = partner_vals[pc].values
             vals = pd.concat([vals], keys=[sample], names=['sample'])
             res.append(vals)
-        return pd.concat(res)
+        res = pd.concat(res)
+        if return_partner_index_name:
+            return res, partner_molecule
+        else:
+            return res
 
     def get_column_flat(
         self,
@@ -306,6 +317,18 @@ class Dataset:
         for name, sample in self.samples_dict.items():
             if name in matrix.keys():
                 sample.values[molecule][column] = matrix[name]
+
+    def rename_molecule(self, molecule: str, new_name: str):
+        if new_name in self.values:
+            raise KeyError(f"{new_name} already exists in values.")
+        molecule_values = self.values[molecule]
+        molecule_values.molecule = new_name
+        self.values[new_name] = molecule_values
+        del self.values[molecule]
+        for sample in self.samples:
+            sample.values[new_name] = sample.values[molecule]
+            del sample.values[molecule]
+        self.molecule_set.rename_molecule(molecule=molecule, new_name=new_name)
 
     def rename_columns(self, columns: Dict[str, str], molecules: Optional[List[str]] = None, inplace: bool = False):
         return rename_values(data=self, columns=columns, molecules=molecules, inplace=inplace)
