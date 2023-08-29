@@ -21,7 +21,7 @@ def mask_molecule(
     for sample_name, sample in dataset.samples_dict.items():
         mds[sample_name] = False
         mds.loc[ids, sample_name] = True
-    return MaskedDataset(dataset=dataset, mask=mds, molecule=molecule)
+    return MaskedDataset(dataset=dataset, masks={molecule:mds})
 
 def mask_molecule_iterable(dataset: Dataset, molecule: str, frac: Optional[float] = None, ids: Optional[Union[pd.Index, List, np.ndarray]] = None,
                            hidden_ids: Optional[Union[pd.Index, List, np.ndarray]] = None,
@@ -30,6 +30,8 @@ def mask_molecule_iterable(dataset: Dataset, molecule: str, frac: Optional[float
         molecules = ids
     else:
         molecules = dataset.molecules[molecule].index
+    if hidden_ids is not None:
+        hidden_ids = {molecule:hidden_ids}
     def sample(sample: DatasetSample):
         vals = sample.values[molecule]
         vals = vals[vals.index.isin(molecules)]
@@ -39,7 +41,7 @@ def mask_molecule_iterable(dataset: Dataset, molecule: str, frac: Optional[float
             sampled_molecules = vals.sample(frac=frac, random_state=random_seed).index
         else:
             sampled_molecules = vals.index
-        return DatasetSampleMask(sample=sample, molecule=molecule, masked=sampled_molecules, hidden=hidden_ids)
+        return DatasetSampleMask(sample=sample, masked={molecule:sampled_molecules}, hidden=hidden_ids)
     MaskedDatasetIterable(dataset=dataset, mask_function=sample, molecule=molecule, has_hidden=hidden_ids is not None)
 
 def mask_missing(
@@ -49,7 +51,7 @@ def mask_missing(
     for sample_name, sample in dataset.samples_dict.items():
         mask[sample_name] = False
         mask.loc[sample.missing_mask(molecule=molecule, column=column), sample_name] = True
-    return MaskedDataset(dataset=dataset, mask=mask, molecule=molecule)
+    return MaskedDataset(dataset=dataset, masks={molecule:mask})
 
 def train_test_non_missing_no_overlap_iterable(
     dataset: Dataset,
@@ -90,15 +92,15 @@ def train_test_non_missing_no_overlap_iterable(
         vals: pd.Series = sample.values[molecule].loc[overall_train_molecules, non_missing_column]
         vals = vals[~vals.isna()]
         train_molecules = vals.sample(frac=train_frac, random_state=random_seed).index
-        return DatasetSampleMask(sample=sample, molecule=molecule, masked=train_molecules, hidden=test_molecules)
+        return DatasetSampleMask(sample=sample, masked={molecule:train_molecules}, hidden={molecule:test_molecules})
 
     def sample_test(sample: DatasetSample):
         vals: pd.Series = sample.values[molecule][non_missing_column][sample.non_missing_mask(molecule=molecule, column=non_missing_column)]
         vals = vals[vals.index.isin(test_molecules)]
-        return DatasetSampleMask(sample=sample, molecule=molecule, masked=vals.index)
+        return DatasetSampleMask(sample=sample, masked={molecule:vals.index})
 
-    train_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_train, molecule=molecule, has_hidden=True)
-    test_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_test, molecule=molecule, has_hidden=False)
+    train_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_train, has_hidden=True)
+    test_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_test, has_hidden=False)
     return train_ds, test_ds
 
 
@@ -117,8 +119,8 @@ def train_test_full(
         train_masks.loc[train_molecules.index, sample_name] = True
         test_masks[sample_name] = False
         test_masks.loc[train_molecules.index, sample_name] = True
-    train_ds = MaskedDataset(dataset=dataset, mask=train_masks)
-    test_ds = MaskedDataset(dataset=dataset, mask=test_masks, hidden=train_masks)
+    train_ds = MaskedDataset(dataset=dataset, masks={molecule:train_masks})
+    test_ds = MaskedDataset(dataset=dataset, masks={molecule:test_masks}, hidden={molecule:train_masks})
     return train_ds, test_ds
 
 
@@ -144,8 +146,8 @@ def train_test_non_missing_no_sample_overlap(
         test_masks[sample_name] = False
         test_masks.loc[test_molecules.index, sample_name] = True
         test_masks.loc[missing.index, sample_name] = False
-    train_ds = MaskedDataset(dataset=dataset, mask=train_masks, hidden=test_masks)
-    test_ds = MaskedDataset(dataset=dataset, mask=test_masks, hidden=train_masks)
+    train_ds = MaskedDataset(dataset=dataset, masks={molecule:train_masks}, hidden={molecule:test_masks})
+    test_ds = MaskedDataset(dataset=dataset, masks={molecule:test_masks}, hidden={molecule:train_masks})
     return train_ds, test_ds
 
 

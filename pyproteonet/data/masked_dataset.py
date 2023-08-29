@@ -1,6 +1,7 @@
 from typing import Dict, Optional, List, Iterable, Union
 
 import pandas as pd
+import numpy as np
 
 from .dataset import Dataset
 from .dataset_sample import DatasetSample
@@ -11,15 +12,18 @@ from ..dgl.graph_key_dataset import GraphKeyDataset
 
 class MaskedDataset(AbstractMaskedDataset):
     def __init__(
-        self, dataset: Dataset, mask: pd.DataFrame, hidden: Optional[pd.DataFrame] = None, molecule: str = "protein"
+        self, dataset: Dataset, masks: Dict[str, pd.DataFrame], hidden: Optional[Dict[str, pd.DataFrame]] = None, 
     ) -> None:
         self.dataset = dataset
-        self.mask = mask
+        self._keys = set.union(*[set(m.keys()) for m in masks.values()])
+        self.masks = masks
         self.hidden = hidden
-        self.molecule = molecule
+        if self.hidden is not None:
+            self._keys = set.union(self._keys, *[set(m.keys()) for m in hidden.values()])
+        self._keys = list(self._keys)
 
     def keys(self) -> Iterable[str]:
-        return self.mask.keys()
+        return self._keys
 
     @property
     def has_hidden(self) -> bool:
@@ -31,19 +35,24 @@ class MaskedDataset(AbstractMaskedDataset):
         return self.dataset[key]
 
     def get_masked_nodes(self, key: str, graph: MoleculeGraph) -> Iterable[int]:
-        node_mapping = graph.node_mapping[self.molecule]
-        mask_nodes = self.mask[key]
-        mask_nodes = mask_nodes.loc[mask_nodes].index
-        mask_nodes = node_mapping.loc[mask_nodes, "node_id"].to_numpy()  # type: ignore
-        return mask_nodes
+        res = [[]]
+        for mol, mask in self.masks.items():
+            node_mapping = graph.node_mapping[mol]
+            mask_nodes = mask[key]
+            mask_nodes = mask_nodes.loc[mask_nodes].index
+            res.append(node_mapping.loc[mask_nodes, "node_id"].to_numpy())  # type: ignore
+        return np.concatenate(res)
 
     def get_hidden_nodes(self, key: str, graph: MoleculeGraph) -> Iterable[int]:
         if self.hidden is None or key not in self.hidden.columns:
             return []
-        node_mapping = graph.node_mapping[self.molecule]
-        hidden_nodes = self.hidden[key]
-        hidden_nodes = hidden_nodes.loc[hidden_nodes].index
-        return node_mapping.loc[hidden_nodes, "node_id"].to_numpy()  # type: ignore
+        res = [[]]
+        for mol, mask in self.hidden.items():
+            node_mapping = graph.node_mapping[mol]
+            hidden_nodes = mask[key]
+            hidden_nodes = hidden_nodes.loc[hidden_nodes].index
+            res.append(node_mapping.loc[hidden_nodes, "node_id"].to_numpy())  # type: ignore
+        return np.concatenate(res)
 
     def get_graph_dataset_dgl(
         self,

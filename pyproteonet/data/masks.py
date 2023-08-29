@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict
 
 import pandas as pd
 import numpy as np
@@ -19,14 +19,20 @@ class MoleculeGraphMask:
 @dataclass
 class DatasetSampleMask:
     sample: DatasetSample
-    molecule: str
-    masked: pd.Series
-    hidden: Optional[pd.Series] = None
+    masked: Dict[str, pd.Series]
+    hidden: Optional[Dict[str, pd.Series]] = None
 
     def to_graph_mask(self, graph: MoleculeGraph)->MoleculeGraphMask:
-        node_mapping = graph.node_mapping[self.molecule]
-        mask_nodes = node_mapping.loc[self.masked, "node_id"].to_numpy()  # type: ignore
+        mask_nodes = []
+        for molecule, mask in self.masked.items():
+            node_mapping = graph.node_mapping[molecule]
+            mask_nodes.append(node_mapping.loc[mask, "node_id"].to_numpy())  # type: ignore
+        mask_nodes = np.concatenate(mask_nodes)
         hidden_nodes = None
         if self.hidden is not None:
-            hidden_nodes = node_mapping.loc[self.hidden, "node_id"].to_numpy()  # type: ignore
+            hidden_nodes = []
+            for molecule, mask in self.hidden.items():
+                node_mapping = graph.node_mapping[molecule]
+                hidden_nodes.append(node_mapping.loc[mask, "node_id"].to_numpy())  # type: ignore
+            hidden_nodes = np.concatenate(hidden_nodes)
         return MoleculeGraphMask(graph=graph, sample=self.sample, masked_nodes=mask_nodes, hidden_nodes=hidden_nodes)

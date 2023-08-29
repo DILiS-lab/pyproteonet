@@ -14,12 +14,10 @@ class MaskedDatasetIterable:
         self,
         dataset: Dataset,
         mask_function: Callable[[DatasetSample], MoleculeGraphMask],
-        molecule: str = "protein",
         has_hidden: bool = True,
     ) -> None:
         self.dataset = dataset
         self.mask_function = mask_function
-        self.molecule = molecule
         self._has_hidden = has_hidden
 
     def keys(self) -> Iterable[str]:
