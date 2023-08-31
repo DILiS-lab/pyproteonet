@@ -68,10 +68,14 @@ class AbstractNodeRegressor(pl.LightningModule):
         if self.out_dim > 1:
             y = y[:, :, 0]
         mae = F.l1_loss(y, target).item()
-        r2 = (torch.corrcoef(torch.t(torch.cat((y, target), 1)))[0, 1] ** 2).item()
+        mse = F.mse_loss(y, target).item()
+        pearson = (torch.corrcoef(torch.t(torch.cat((y, target), 1)))[0, 1]).item()
         self.log(f"{prefix}_loss", loss, batch_size=batch_size)
+        self.log(f"{prefix}_mse", mse, batch_size=batch_size)
+        self.log(f"{prefix}_rmse", mse**0.5, batch_size=batch_size)
         self.log(f"{prefix}_mae", mae, batch_size=batch_size)
-        self.log(f"{prefix}_r2", r2, batch_size=batch_size)
+        self.log(f"{prefix}_r2", pearson**2, batch_size=batch_size)
+        self.log(f"{prefix}_pearson", pearson, batch_size=batch_size)
 
     def training_step(self, batch, batch_idx):
         graph = batch

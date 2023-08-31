@@ -133,6 +133,8 @@ class MoleculeSet:
         molecule_columns_partner: List[str] = [],
         partner_molecule: str = None,
     ):
+        if molecule is not None and molecule not in self.molecules:
+            raise KeyError(f"Molecule type {molecule} does not exist!")
         mapping = self._infer_mapping(molecule=molecule, mapping=mapping)
         mapped = self.mappings[mapping].copy()
         if molecule is not None:

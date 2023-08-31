@@ -3,4 +3,4 @@ from .modification import per_molecule_random_scaling
 from .random_error import add_positive_gaussian, poisson_error
 from .missing_values import simulate_mcars, simulate_mnars_thresholding
 from .protein_peptide import simulate_protein_peptide_dataset
-from .mimic import ProteinPeptideDatasetMocker
+from .mock import ProteinPeptideDatasetMocker

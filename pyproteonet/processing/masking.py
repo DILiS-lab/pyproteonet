@@ -1,4 +1,5 @@
-from typing import Optional, Tuple, Iterable, Union, List
+from typing import Optional, Tuple, Iterable, Union, List, Dict
+import collections.abc
 
 from numpy.random import Generator
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, ShuffleSplit, train_test_split
@@ -57,9 +58,9 @@ def train_test_non_missing_no_overlap_iterable(
     dataset: Dataset,
     train_frac: float = 0.1,
     test_frac: float = 0.1,
-    molecule: str = "protein",
+    molecule: Union[str, Iterable] = "protein",
     non_missing_column: str = "abundance",
-    ids: Optional[Union[pd.Index, List, np.ndarray]] = None, 
+    ids: Optional[Dict[str, Union[pd.Index, List, np.ndarray]]] = None, 
     random_seed: Optional[int] = None,
 ) -> Tuple[MaskedDatasetIterable, MaskedDatasetIterable]:
     """Generates an iterable dataset with random, non-missing train molecules and a fixed set of test molecules.
@@ -80,24 +81,34 @@ def train_test_non_missing_no_overlap_iterable(
 
     Returns:
         Tuple[MaskedDatasetIterable, MaskedDatasetIterable]: Tuple of train and test iterable datasets.
-    """    
-    available_molecules = dataset.molecules[molecule]
-    if ids is not None:
-        available_molecules = available_molecules.loc[ids]
-
-    test_molecules = available_molecules.sample(frac=test_frac, random_state=random_seed).index
-    overall_train_molecules = available_molecules[~available_molecules.index.isin(test_molecules)].index
+    """   
+    if isinstance(molecule, str):
+        if ids is not None and not isinstance(ids, dict):
+            ids = {molecule: ids}
+        molecule = [molecule]
+    test_molecules = dict()
+    overall_train_molecules = dict()
+    for mol in molecule:
+        available_molecules = dataset.molecules[mol]
+        if ids is not None:
+            available_molecules = available_molecules.loc[ids[mol]]
+        test_molecules[mol] = available_molecules.sample(frac=test_frac, random_state=random_seed).index
+        overall_train_molecules[mol] = available_molecules[~available_molecules.index.isin(test_molecules)].index
 
     def sample_train(sample: DatasetSample):
-        vals: pd.Series = sample.values[molecule].loc[overall_train_molecules, non_missing_column]
-        vals = vals[~vals.isna()]
-        train_molecules = vals.sample(frac=train_frac, random_state=random_seed).index
-        return DatasetSampleMask(sample=sample, masked={molecule:train_molecules}, hidden={molecule:test_molecules})
+        train_molecules = dict()
+        for mol in molecule:
+            vals: pd.Series = sample.values[mol].loc[overall_train_molecules[mol], non_missing_column]
+            vals = vals[~vals.isna()]
+            train_molecules[mol] = vals.sample(frac=train_frac, random_state=random_seed).index
+        return DatasetSampleMask(sample=sample, masked=train_molecules, hidden=test_molecules)
 
     def sample_test(sample: DatasetSample):
-        vals: pd.Series = sample.values[molecule][non_missing_column][sample.non_missing_mask(molecule=molecule, column=non_missing_column)]
-        vals = vals[vals.index.isin(test_molecules)]
-        return DatasetSampleMask(sample=sample, masked={molecule:vals.index})
+        test_non_missing = dict()
+        for mol in molecule:
+            vals: pd.Series = sample.values[mol][non_missing_column][sample.non_missing_mask(molecule=mol, column=non_missing_column)]
+            test_non_missing[mol] = vals[vals.index.isin(test_molecules[mol])].index
+        return DatasetSampleMask(sample=sample, masked=test_non_missing)
 
     train_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_train, has_hidden=True)
     test_ds = MaskedDatasetIterable(dataset=dataset, mask_function=sample_test, has_hidden=False)

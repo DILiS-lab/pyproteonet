@@ -32,7 +32,8 @@ class MaskedDatasetIterable:
 
     def __iter__(self)->Iterable[DatasetSampleMask]:
         for sample in self.dataset.samples:
-            yield self.mask_function(sample)
+            sample_mask = self.mask_function(sample)
+            yield sample_mask
 
     def get_graph_dataset_dgl(
         self,

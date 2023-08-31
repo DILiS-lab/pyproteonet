@@ -74,7 +74,7 @@ def simulate_mcars_sample(
     column: str = "abundance",
     result_column: Optional[str] = None,
     mask_column: Optional[str] = None,
-    mask_only_non_missing: bool = True, 
+    mask_only_non_missing: bool = False, 
     rng: Optional[Generator] = None,
 ):
     if rng is None:

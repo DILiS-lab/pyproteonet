@@ -17,6 +17,7 @@ from ..dgl.gnn_architectures.resettable_module import ResettableModule
 from ..lightning.node_regression_module import NodeRegressionModule
 from ..lightning.console_logger import ConsoleLogger
 from ..data.abstract_masked_dataset import AbstractMaskedDataset
+from ..data.masked_dataset import MaskedDataset
 
 
 class GnnPredictor:
@@ -28,7 +29,7 @@ class GnnPredictor:
         target_column: str = "abundance",
         module: Optional[pl.LightningModule] = None,
         model: ResettableModule = GAT(in_dim=4, hidden_dim=40, out_dim=1, num_heads=20),
-        missing_substitute_value: float = 0,
+        missing_substitute_value: float = -3,
         bidirectional_graph: bool = True,
         logger: Logger = ConsoleLogger(),  # type: ignore
     ):
@@ -131,7 +132,7 @@ class GnnPredictor:
 
     def predict(
         self,
-        mds: AbstractMaskedDataset,
+        mds: MaskedDataset,
         result_column: Optional[Union[str, Tuple[str]]] = None,
         copy_non_predicted_from_target_column: bool = True,
         silent: bool = False,
@@ -170,20 +171,23 @@ class GnnPredictor:
             for i, prediction in enumerate(predictions):
                 batch = graph_ds[i]
                 mask_nodes = batch.ndata["mask"].detach().squeeze().numpy()
-                assert np.all(graph.nodes.iloc[mask_nodes].type == graph.type_mapping[mds.molecule])
-                prediction = prediction[mask_nodes]
                 sample = graph_ds.index_to_sample(i)
-                if copy_non_predicted_from_target_column:
-                    # TODO
-                    sample.values[mds.molecule].loc[:, result_column[0]] = sample.values[mds.molecule].loc[
-                        :, self.target_column
-                    ]
-                else:
-                    sample.values[mds.molecule].loc[:, result_column] = sample.dataset.missing_value
-                molecules = graph.nodes.loc[mask_nodes.nonzero(), "molecule_id"].values  # type: ignore
-                prediction = prediction.detach().numpy()
-                for i, c in enumerate(result_column):
-                    sample.values[mds.molecule].loc[molecules, c] = prediction[:, i]
+                for molecule_type in graph.nodes.type[mask_nodes].unique():
+                    #assert np.all(graph.nodes.iloc[mask_nodes].type == graph.type_mapping[mol])
+                    mask_nodes = mask_nodes & (graph.nodes.type == molecule_type).to_numpy()
+                    mol = graph.inverse_type_mapping[molecule_type]
+                    prediction = prediction[mask_nodes]
+                    if copy_non_predicted_from_target_column:
+                        # TODO
+                        sample.values[mol].loc[:, result_column[0]] = sample.values[mol].loc[
+                            :, self.target_column
+                        ]
+                    else:
+                        sample.values[mol].loc[:, result_column] = sample.dataset.missing_value
+                    molecules = graph.nodes.loc[mask_nodes.nonzero(), "molecule_id"].values  # type: ignore
+                    prediction = prediction.detach().numpy()
+                    for i, c in enumerate(result_column):
+                        sample.values[mol].loc[molecules, c] = prediction[:, i]
 
     @property
     def out_dim(self):

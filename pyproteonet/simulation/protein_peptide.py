@@ -101,6 +101,8 @@ def simulate_protein_peptide_dataset(
         column=protein_column,
         random_seed=seed,
     )
+    if print_parameters:
+        print(f"Number samples: {len(dataset.samples_dict)}")
     for samples, affected, mean, std in zip(condition_samples, condition_affected, log2_condition_means, log2_condition_stds):
         introduce_random_condition(
             dataset,
