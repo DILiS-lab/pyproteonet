@@ -25,7 +25,7 @@ def plot_ratios_volcano(
     point_size: float = 2,
     label: Optional[str] = None,
 ):
-    values = dataset.get_samples_value_matrix(molecule=molecule, value_column=column, samples=samples_a + samples_b)
+    values = dataset.get_samples_value_matrix(molecule=molecule, column=column, samples=samples_a + samples_b)
     overall_missing = values.to_numpy().flatten()
     overall_missing = np.isnan(overall_missing).sum() / overall_missing.shape[0]
     groups = []

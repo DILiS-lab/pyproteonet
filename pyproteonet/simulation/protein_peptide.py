@@ -9,6 +9,7 @@ from .sampling import draw_normal_log_space
 from .modification import per_molecule_random_scaling, introduce_random_condition
 from .random_error import multiply_exponential_gaussian, add_positive_gaussian, poisson_error
 from ..processing.aggregation import neighbor_sum
+from pyproteonet.quantification.neighbor_summarization import neighbor_aggregation
 
 
 def simulate_protein_peptide_dataset(
@@ -33,6 +34,8 @@ def simulate_protein_peptide_dataset(
     peptide_column: str = "abundance",
     protein_molecule: str = "protein",
     peptide_molecule: str = "peptide",
+    calculate_peptide_gt: bool = True,
+    peptide_gt_column: Optional[str] = None,
     random_seed: Optional[Union[int, np.random.Generator]] = None,
     print_parameters: bool = False,
 ) -> Dataset:
@@ -167,4 +170,9 @@ def simulate_protein_peptide_dataset(
             dataset=dataset, molecule=peptide_molecule, column=peptide_column, random_seed=seed, inplace=True
         )
     dataset.values[protein_molecule][protein_column] = ground_truth_prot_vals
+    if calculate_peptide_gt:
+        if peptide_gt_column is None:
+            peptide_gt_column = peptide_column + '_gt'
+        dataset.values[peptide_molecule][peptide_gt_column] = neighbor_aggregation(dataset=dataset, molecule=peptide_molecule, mapping=mapping,
+                                                                                   partner_column=protein_column, method='sum', only_unique=False)
     return dataset

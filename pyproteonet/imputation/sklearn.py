@@ -13,8 +13,8 @@ def generic_matrix_imputation(
     column: str,
     imputation_function: Callable[[np.ndarray], np.ndarray],
     **kwargs
-) -> Dataset:
-    matrix = dataset.get_samples_value_matrix(molecule=molecule, value_column=column)
+) -> pd.Series:
+    matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     matrix_imputed = imputation_function(matrix, **kwargs)
     matrix_imputed = pd.DataFrame(matrix_imputed, columns=matrix.columns, index=matrix.index)
     assert matrix.shape == matrix_imputed.shape
@@ -27,7 +27,7 @@ def generic_matrix_imputation(
 def knn_impute(
     dataset: Dataset, molecule: str, column: str, **kwargs
 ) -> Dataset:
-    imputer = KNNImputer(missing_values=dataset.missing_value, keep_empty_features=False, **kwargs)
+    imputer = KNNImputer(missing_values=dataset.missing_value, **kwargs)
     imputed = generic_matrix_imputation(
         dataset=dataset,
         molecule=molecule,
@@ -36,10 +36,15 @@ def knn_impute(
     )
     return imputed
 
-def iterative_svd_impute(
-    dataset: Dataset, molecule: str, column: str, min_value=0.001, **kwargs
-) -> Dataset:
-    imputer = IterativeImputer(missing_values=dataset.missing_value, keep_empty_features=False, min_value=min_value, **kwargs)
+def iterative_impute(
+    dataset: Dataset, molecule: str, column: str, min_value:Optional[float]=None, max_value:Optional[float]=None, **kwargs
+) -> pd.Series:
+    if min_value is None:
+        min_value = dataset.values[molecule][column].min()
+    if max_value is None:
+        max_value = dataset.values[molecule][column].max()
+    imputer = IterativeImputer(missing_values=dataset.missing_value, keep_empty_features=False,
+                               min_value=min_value, max_value=max_value **kwargs)
     imputed = generic_matrix_imputation(
         dataset=dataset,
         molecule=molecule,

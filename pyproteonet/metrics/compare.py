@@ -71,3 +71,20 @@ def compare_columns_with_gt(
         else:
             res[c] = metric(gt, val)
     return res
+
+def compare_columns_with_gt_multi_datasets(datasets: List[Dataset],
+    columns: List[str], per_sample: bool =False, *args, **kwargs)->pd.DataFrame:
+    if 'dataset' in columns:
+        raise RuntimeError("The name 'dataset' is reserved for the output dataframe and cannot be the name of a column to compare")
+    metrics_df = []
+    for i,dataset in enumerate(datasets):
+        metrics = compare_columns_with_gt(dataset=dataset, columns=columns, per_sample=per_sample, *args, **kwargs)
+        if per_sample:
+            metrics = {column: list(metric.values()) for column,metric in metrics.items()}
+        else:
+            metrics = {column: [metric] for column,metric in metrics.items()}
+        df = pd.DataFrame(metrics)
+        df['dataset']=i
+        metrics_df.append(df)
+    metrics_df = pd.concat(metrics_df, ignore_index=True)
+    return metrics_df

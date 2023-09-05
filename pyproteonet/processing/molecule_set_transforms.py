@@ -11,10 +11,9 @@ from ..data.dataset import Dataset
 
 
 def map_protein_sequence(
-    input: MoleculeSet,
-    uniprot_id_column: Optional[str] = None,
+    uniprot_ids: pd.Series,
     result_column: Optional[str] = "sequence",
-    request_size: int = 50,
+    request_size: int = 200,
 ) -> pd.Series:
     """
     Retrieve uniprot sequences based on a list of uniprot sequence identifier.
@@ -32,11 +31,11 @@ def map_protein_sequence(
     Returns:
         Optional[MoleculeSet]: The transformed input or None if inplace=True
     """
-    molecules = input.molecules
-    if "protein" not in molecules:
-        raise KeyError('MoleculeSet must have "protein" to map protein sequences.')
-    molecules = molecules["protein"]
-    uniprot_ids = molecules[uniprot_id_column] if uniprot_id_column is not None else molecules.index
+    #molecules = input.molecules
+    #if "protein" not in molecules:
+    #    raise KeyError('MoleculeSet must have "protein" to map protein sequences.')
+    #molecules = molecules["protein"]
+    #uniprot_ids = molecules[uniprot_id_column] if uniprot_id_column is not None else molecules.index
     base_url = "http://rest.uniprot.org/uniprotkb/search"
     start = 0
     results = []
@@ -62,9 +61,10 @@ def map_protein_sequence(
             df_result.columns = ["entry", "sequence"]
             results.append(df_result)
     results = pd.concat(results, ignore_index=True)
-    results.set_index("entry", drop=True, inplace=True, verify_integrity=True)
-    assert len(results) == len(uniprot_ids) and uniprot_ids.isin(results.index).all()
+    #results.set_index("entry", drop=True, inplace=True, verify_integrity=True)
+    #assert len(results) == len(uniprot_ids) and uniprot_ids.isin(results.index).all()
     results.loc[results.sequence.isna(), "sequence"] = ""
+    return results
     if result_column is not None:
         molecules[result_column] = results.loc[uniprot_ids, "sequence"].values
         return molecules['sequence']

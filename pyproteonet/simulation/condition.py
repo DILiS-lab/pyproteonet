@@ -12,7 +12,8 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
                             input_column: str = 'abundance', output_column: str = 'condition_abundance', mapping: str = 'gene',
                             condition_affected_frac: Optional[float] = 0.15, condition_affected_proteins: Optional[List] = None,
                             condition_log2_mean: float = 0, condition_log2_std: float = 1,
-                            error_log2_mean: float = 0, error_log2_std: float = 0.1, inplace: bool = False) -> Dataset:
+                            error_log2_mean: float = 0, error_log2_std: float = 0.1, inplace: bool = False,
+                            condition_factor_base: float = 2) -> Dataset:
     if condition_affected_frac is None and condition_affected_proteins is None:
         raise AttributeError("Either frac_condition_affected or condition_proteins must be set!")
     if not inplace:
@@ -53,7 +54,7 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
             mapped['prot_abundance'] = protein_values.loc[mapped.protein, input_column].values
             error = rng.normal(loc=error_log2_mean, scale=error_log2_std, size=len(condition_proteins))
             protein_values[output_column] = protein_values[input_column]
-            protein_values.loc[condition_proteins.index, output_column] *= 2**(condition_proteins['condition_effect'] + error)
+            protein_values.loc[condition_proteins.index, output_column] *= condition_factor_base**(condition_proteins['condition_effect'] + error)
             protein_values[output_column][protein_values[output_column]<=0] = np.nan
         
             mapped['pep_abundance'] = peptide_values.loc[mapped.peptide, input_column].values
@@ -66,7 +67,7 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
             cond_mapped = mapped.loc[mapped_condition_mask]
             mapped['mask'] = mapped_condition_mask
             mapped.loc[:, 'cond_scaling_factor'] = 1
-            mapped.loc[mapped_condition_mask, 'cond_scaling_factor'] = 2**(condition_proteins.loc[cond_mapped['protein'], 'condition_effect'].values + cond_mapped['pep_error'])
+            mapped.loc[mapped_condition_mask, 'cond_scaling_factor'] = condition_factor_base**(condition_proteins.loc[cond_mapped['protein'], 'condition_effect'].values + cond_mapped['pep_error'])
             mapped['res'] = mapped['pep_scaling_factor'] * mapped['pep_abundance'] * mapped['cond_scaling_factor']
             peptide_values[output_column] = mapped.groupby('peptide').res.sum()
             peptide_values[output_column][peptide_values[output_column]<=0] = np.nan

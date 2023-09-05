@@ -14,7 +14,7 @@ def across_sample_aggregate(dataset: Dataset, molecule: str, column: str, method
         fn = np.nanmedian
     else:
         raise AttributeError(f'Method {method} not supported')
-    matrix = dataset.get_samples_value_matrix(molecule=molecule, value_column=column)
+    matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     matrix_imputed = matrix.to_numpy()
     imp_value = fn(matrix_imputed, axis=1)
     missing_mask = np.isnan(matrix_imputed)
@@ -34,7 +34,7 @@ def across_sample_aggregate(dataset: Dataset, molecule: str, column: str, method
     return vals
 
 def min_det_impute(dataset, molecule: str, column: str, percentile=0.01):
-    matrix = dataset.get_samples_value_matrix(molecule=molecule, value_column=column)
+    matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     matrix_imputed = matrix.to_numpy()
     percentile = np.nanpercentile(matrix_imputed, q=percentile, axis=0)
     percentile = np.tile(percentile[np.newaxis,:], (matrix_imputed.shape[0],1))

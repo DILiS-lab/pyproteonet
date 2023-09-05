@@ -84,7 +84,10 @@ class Dataset:
         dir_path.mkdir(parents=True, exist_ok=overwrite)
         samples_dir = dir_path / "samples"
         if samples_dir.exists():
-            shutil.rmtree(samples_dir)
+            if overwrite:
+                shutil.rmtree(samples_dir)
+            else:
+                raise FileExistsError(f"{samples_dir} already exists")
         samples_dir.mkdir()
         self.molecule_set.save(dir_path / "molecule_set.h5", overwrite=overwrite)
         with open(dir_path / "dataset_info.json", "w") as f:
@@ -108,7 +111,7 @@ class Dataset:
             index_names = molecules
         for molecule, index_name in zip(molecules, index_names):
             for column in columns:
-                vals = self.get_samples_value_matrix(molecule=molecule, value_column=column, molecule_columns=molecule_columns)
+                vals = self.get_samples_value_matrix(molecule=molecule, column=column, molecule_columns=molecule_columns)
                 vals.index.set_names(index_name, inplace=True)
                 vals = vals.reset_index()
                 vals.to_csv(output_dir / f"{molecule}_{column}.tsv", sep="\t", na_rep=na_rep, index=False)
@@ -216,21 +219,22 @@ class Dataset:
                    return_partner_index_name: bool = False)->Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
         #if not columns:
         #    raise AttributeError("The list of columns needs to contain at least one column!")
-        mapped = self.molecule_set.get_mapped(molecule=molecule, partner_molecule=partner_molecule, mapping=mapping,
-                                              molecule_columns=molecule_columns, molecule_columns_partner=molecule_columns_partner)
+        mapping = self.molecule_set.get_mapping(molecule=molecule, partner_molecule=partner_molecule, mapping_name=mapping,
+                                                molecule_columns=molecule_columns, partner_columns=molecule_columns_partner)
         if partner_molecule is None:
-            partner_molecule = [n for n in mapped.index.names if n not in {'sample', molecule}]
-            assert len(partner_molecule) == 1
-            partner_molecule = partner_molecule[0]
-        cols = set(mapped.columns)
+            #partner_molecule = [n for n in mapping.mapping_molecules if n not in {'sample', molecule}]
+            #assert len(partner_molecule) == 1
+            partner_molecule = mapping.mapping_molecules[1]
+        cols = set(mapping.df.columns)
         if samples is None:
             samples = self.sample_names
-        if 'sample' in mapped.index.names:
+        if 'sample' in mapping.df.index.names:
+            raise RuntimeError("ERROR") #TODO: this should never happen, so we might remove it
             sample_maps = {sample: m.set_index([molecule, partner_molecule]) for sample,m in mapped.groupby('sample') if sample in samples}
         else:
             sample_maps = {}
             for sample in samples:
-                sample_maps[sample] = mapped.copy()
+                sample_maps[sample] = mapping.df.copy()
         if cols.intersection(columns):
             raise AttributeError("Result would have duplicated column names!")
         cols.update(columns)
@@ -238,10 +242,10 @@ class Dataset:
             raise AttributeError("Result would have duplicated column names!")
         res = []
         for sample, map in sample_maps.items():
-            vals = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(molecule), columns]
+            vals = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(0), columns]
             vals.set_index(map.index, inplace=True)
             if partner_columns:
-                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(partner_molecule), partner_columns]
+                partner_vals = self.samples_dict[sample].values[partner_molecule].loc[map.index.get_level_values(1), partner_columns]
                 for pc in partner_vals:
                     vals[pc] = partner_vals[pc].values
             vals = pd.concat([vals], keys=[sample], names=['sample'])
@@ -261,7 +265,7 @@ class Dataset:
         return_missing_mask: bool = False,
         drop_sample_id: bool = False,
     ):
-        vals = self.get_samples_value_matrix(molecule=molecule, value_column=column, molecule_columns=[],
+        vals = self.get_samples_value_matrix(molecule=molecule, column=column, molecule_columns=[],
                                              samples=samples, ids=ids).stack(dropna=False)
         vals.index.set_names(["id", "sample"], inplace=True)
         vals = vals.swaplevel()
@@ -296,7 +300,7 @@ class Dataset:
             assert group.index.isin(sample_values.index).all()
             sample_values[column] = group
 
-    def get_samples_value_matrix(self, molecule: str, value_column: str = "abundance", molecule_columns: Union[bool, List[str]] = [],
+    def get_samples_value_matrix(self, molecule: str, column: str = "abundance", molecule_columns: Union[bool, List[str]] = [],
                                  samples: Optional[List[str]] = None, ids: Optional[Iterable] = None):
         if samples is None:
             samples = self.sample_names
@@ -308,7 +312,7 @@ class Dataset:
             res = self.molecules[molecule].loc[:, []].copy()
         for name in samples:
             res[name] = self.missing_value
-            res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, value_column]
+            res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, column]
         if molecule_columns:
             res.loc[:, molecule_columns] = self.molecules[molecule].loc[:, molecule_columns]
         return res

@@ -51,7 +51,7 @@ def gnn_impute(
         gnnds.values[partner_molecule]["gnninput"] = (vals - partner_mean) / partner_std
 
     train_mds, test_mds = train_test_non_missing_no_overlap_iterable(
-        dataset=gnnds, train_frac=train_frac, test_frac=test_frac, molecule=molecule, non_missing_column="gnninput"
+        dataset=gnnds, train_frac=train_frac, test_frac=test_frac, molecule=[molecule, partner_molecule], non_missing_column="gnninput"
     )
     if silent:
         logger = None

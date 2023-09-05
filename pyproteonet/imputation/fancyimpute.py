@@ -21,7 +21,7 @@ def generic_fancy_impute(
         dataset = dataset.copy()
     if result_column is None:
         result_column = column
-    matrix = dataset.get_samples_value_matrix(molecule=molecule, value_column=column)
+    matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     matrix_vals = matrix.values
     missing_mask = eq_nan(matrix_vals, dataset.missing_value)
     matrix_vals[missing_mask] = 0
@@ -32,9 +32,9 @@ def generic_fancy_impute(
     return vals
 
 def iterative_svd_impute(
-    dataset: Dataset, molecule: str, column: str, result_column: Optional[str] = None, inplace: bool = False, **kwargs
+    dataset: Dataset, molecule: str, column: str, result_column: Optional[str] = None, inplace: bool = False, min_value=0.001, **kwargs
 ) -> Dataset:
-    imputer = IterativeSVD(**kwargs)
+    imputer = IterativeSVD(min_value=min_value, **kwargs)
     dataset = generic_fancy_impute(
         dataset=dataset, molecule=molecule, column=column, imputer=imputer, result_column=result_column, inplace=inplace
     )

@@ -42,11 +42,11 @@ def create_graph_nodes_edges(
         node_mapping[key] = pd.DataFrame({"node_id": node_ids}, index=index)
     edges = []
     for mapping in mappings:
-        mapped = molecule_set.get_mapped(mapping=mapping)
-        source_key, destination_key = mapped.index.names
-        mapped["source_node"] = node_mapping[source_key].loc[mapped.index.get_level_values(source_key), "node_id"].to_numpy()
-        mapped["destination_node"] = node_mapping[destination_key].loc[mapped.index.get_level_values(destination_key), "node_id"].to_numpy()
-        edges.append(mapped.loc[:, ["source_node", "destination_node"]])
+        mapping = molecule_set.get_mapping(mapping_name=mapping)
+        source_mol, destination_mol = mapping.mapping_molecules
+        source_mol = node_mapping[source_mol].loc[mapping.df.index.get_level_values(0), "node_id"].to_numpy()
+        destination_mol = node_mapping[destination_mol].loc[mapping.df.index.get_level_values(1), "node_id"].to_numpy()
+        edges.append(pd.DataFrame({"source_node":source_mol, "destination_node":destination_mol}))
     edges = pd.concat(edges, ignore_index=True)
     if make_bidirectional:
         edges2 = pd.DataFrame({"source_node": edges.destination_node, "destination_node": edges.source_node})

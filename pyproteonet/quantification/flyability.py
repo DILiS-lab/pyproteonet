@@ -48,11 +48,11 @@ def estimate_flyability_upper_bound(
     if pbar:
         iterator = tqdm(iterator)
     for sample in iterator:
-        mapped[column] = sample.values[peptide_molecule][column].loc[mapped[peptide_molecule]].values
+        mapped.loc[:, column] = sample.values[peptide_molecule][column].loc[mapped[peptide_molecule]].values
         groups = mapped.groupby(protein_molecule)[column]
-        mapped["max"] = groups.max().loc[mapped[protein_molecule]].values
-        mapped["sum"] = groups.sum().loc[mapped[protein_molecule]].values
-        mapped["count"] = groups.count().loc[mapped[protein_molecule]].values
+        mapped.loc[:, "max"] = groups.max().loc[mapped[protein_molecule]].values
+        mapped.loc[:, "sum"] = groups.sum().loc[mapped[protein_molecule]].values
+        mapped.loc[:, "count"] = groups.count().loc[mapped[protein_molecule]].values
         max_d = (mapped[column] / mapped["max"])[mapped["count"] > 1]
         if remove_one:
             max_d = max_d[max_d != 1]

@@ -94,6 +94,7 @@ class ProteinPeptideDatasetMocker:
                 thresh_sigma=thresh_sigma,
                 molecule=self.peptide_molecule,
                 column="abundance",
+                result_column="abundance_missing",
                 rng=random_seed,
                 inplace=True,
                 mask_column='is_mnar'
@@ -116,7 +117,8 @@ class ProteinPeptideDatasetMocker:
                 amount=mcar_frac,
                 rng=random_seed,
                 molecule="peptide",
-                column="abundance",
+                column="abundance_missing",
+                result_column="abundance_missing",
                 inplace=True,
                 mask_column='is_mcar',
                 mask_only_non_missing = True,
