@@ -119,6 +119,7 @@ class MoleculeSet:
             for key in mapping_keys:
                 if len(key.split('/')) == 5:
                     _, _, mapping_name, m1, m2 = key.split('/')
+                    print(mapping_name, m1, m2)
                     mappings[mapping_name] = MoleculeMapping(name=mapping_name, df=store[key], mapping_molecules=(m1,m2))
                 elif len(key.split('/')) == 3:#legacy format
                     mapping_name = key.split('/')[-1]
@@ -144,7 +145,9 @@ class MoleculeSet:
                 m1, m2 = mapping.mapping_molecules[0], mapping.mapping_molecules[1]
                 _check_name(m1)
                 _check_name(m2)
-                store[f"mapping/{mapping_name}/{m1}/{m2}"] = mapping.df
+                identifier = f"mapping/{mapping_name}/{m1}/{m2}"
+                print(identifier)
+                store[identifier] = mapping.df
 
     def copy(self) -> "MoleculeSet":
         molecules = {}

@@ -12,7 +12,10 @@ from ..dgl.graph_key_dataset import GraphKeyDataset
 
 class MaskedDataset(AbstractMaskedDataset):
     def __init__(
-        self, dataset: Dataset, masks: Dict[str, pd.DataFrame], hidden: Optional[Dict[str, pd.DataFrame]] = None, 
+        self,
+        dataset: Dataset,
+        masks: Dict[str, pd.DataFrame],
+        hidden: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> None:
         self.dataset = dataset
         self._keys = set.union(*[set(m.keys()) for m in masks.values()])
@@ -21,6 +24,20 @@ class MaskedDataset(AbstractMaskedDataset):
         if self.hidden is not None:
             self._keys = set.union(self._keys, *[set(m.keys()) for m in hidden.values()])
         self._keys = list(self._keys)
+
+    @classmethod
+    def from_ids(
+        cls, dataset: Dataset, mask_ids: Dict[str, pd.Index], hidden_ids: Optional[Dict[str, pd.Index]] = None
+    ) -> "MaskedDataset":
+        masks = dict()
+        for mol, ids in mask_ids.items():
+            masks[mol] = _ids_to_mask(dataset=dataset, molecule=mol, ids=ids)
+        hidden = None
+        if hidden_ids is not None:
+            hidden = dict()
+            for mol, ids in hidden_ids.items():
+                hidden[mol] = _ids_to_mask(dataset=dataset, molecule=mol, ids=ids)
+        return cls(dataset=dataset, masks=masks, hidden=hidden)
 
     def keys(self) -> Iterable[str]:
         return self._keys
@@ -60,7 +77,7 @@ class MaskedDataset(AbstractMaskedDataset):
         value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
         molecule_columns: List[str] = [],
         target_column: str = "abundance",
-        missing_column_value: Optional[float] = None
+        missing_column_value: Optional[float] = None,
     ) -> GraphKeyDataset:
         return GraphKeyDataset(
             masked_dataset=self,
@@ -68,5 +85,17 @@ class MaskedDataset(AbstractMaskedDataset):
             value_columns=value_columns,
             molecule_columns=molecule_columns,
             target_column=target_column,
-            missing_column_value=missing_column_value
+            missing_column_value=missing_column_value,
         )
+
+
+def _ids_to_mask(dataset: Dataset, molecule: str, ids: pd.Index):
+    mask = pd.DataFrame(index=dataset.molecules[molecule].index, data={sample: False for sample in dataset.sample_names})
+    if "sample" in ids.names:
+        m = pd.Series(index=ids, data=True)
+        m = m.unstack(level="sample", fill_value=False)
+        mask.loc[m.index, m.columns] = m
+    else:
+        for sample in dataset.sample_names:
+            mask.loc[ids, sample] = True
+    return mask

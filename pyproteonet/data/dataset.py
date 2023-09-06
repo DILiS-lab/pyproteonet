@@ -55,8 +55,9 @@ class Dataset:
         self.missing_value = missing_value
         self.missing_label_value = np.nan
         self.samples_dict = OrderedDict(samples)
-        for sample in self.samples_dict.values():
+        for name, sample in self.samples_dict.items():
             sample.dataset = self
+            sample.name = name
         self.values = {molecule: DatasetMoleculeValues(self, molecule) for molecule in self.molecules.keys()}
 
     @classmethod
@@ -130,7 +131,7 @@ class Dataset:
             values[mol].index.name = "id"
         for key, vals in [(key, vals) for key, vals in values.items() if key not in self.molecules.keys()]:
             values[key] = vals
-        self.samples_dict[name] = DatasetSample(dataset=self, values=values)
+        self.samples_dict[name] = DatasetSample(dataset=self, values=values, name=name)
 
     @property
     def samples(self) -> Iterable[DatasetSample]:

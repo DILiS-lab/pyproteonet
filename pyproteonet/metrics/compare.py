@@ -6,50 +6,55 @@ from scipy.stats import pearsonr, spearmanr
 
 from ..data.dataset import Dataset
 
+
 def _get_metric_from_str(metric: str):
     metric = metric.lower()
-    if metric == 'pearsonr':
+    if metric == "pearsonr":
         res = lambda val, gt: pearsonr(val, gt)[0]
-    elif metric == 'spearmanr':
+    elif metric == "spearmanr":
         res = lambda val, gt: spearmanr(val, gt)[0]
-    elif metric == 'mse':
-        res = lambda val, gt: ((val-gt)**2).mean()
-    elif metric == 'rmse':
-        res = lambda val, gt: (((val-gt)**2).mean())**0.5
+    elif metric == "mse":
+        res = lambda val, gt: ((val - gt) ** 2).mean()
+    elif metric == "rmse":
+        res = lambda val, gt: (((val - gt) ** 2).mean()) ** 0.5
     else:
         raise AttributeError(f"Metric {metric} not found!")
     return res
+
 
 def compare_columns_with_gt(
     dataset: Dataset,
     molecule: str,
     columns: List[str],
     gt_column: str,
+    ids: Optional[pd.Index] = None,
     metric: Union[Callable, str] = pearsonr,
     ignore_missing: bool = True,
-    ids: Optional[pd.Index] = None,
     logarithmize: bool = True,
-    per_sample: bool = False
+    per_sample: bool = False,
+    return_counts: bool = False,
 ) -> Dict[str, float]:
     if isinstance(metric, str):
         metric = _get_metric_from_str(metric)
     val = dataset.get_values_flat(molecule=molecule, columns=columns)
     gt = dataset.get_column_flat(molecule=molecule, column=gt_column)
     if ids is not None:
-        if 'sample' not in ids.names:
-            assert len(ids.names)==1
+        if "sample" not in ids.names:
+            assert len(ids.names) == 1
             concat = []
             for sample_name in dataset.sample_names:
-                concat.append(pd.DataFrame({'sample':sample_name, 'id':ids}))
-            ids = pd.concat(concat).set_index(('sample', 'id'))
+                concat.append(pd.DataFrame({"sample": sample_name, "id": ids}))
+            ids = pd.concat(concat).set_index(("sample", "id"))
         val = val[val.index.isin(ids)]
         gt = gt[gt.index.isin(ids)]
     gt_missing = gt.isna()
-    val_missing = {c:val[c].isna() for c in columns}
+    val_missing = {c: val[c].isna() for c in columns}
     if logarithmize:
         val, gt = np.log(val), np.log(gt)
     if not ignore_missing and (any([vm.sum() > 0 for vm in val_missing.values()]) or gt_missing.sum() > 0):
-        raise ValueError("There are missing values in the column or ground truth. If you want to ignore them set ignore_missing_values.")
+        raise ValueError(
+            "There are missing values in the column or ground truth. If you want to ignore them set ignore_missing_values."
+        )
     else:
         gt_columns = {}
         val_columns = {}
@@ -57,34 +62,85 @@ def compare_columns_with_gt(
             mask = ~(val_missing[c] | gt_missing)
             gt = gt[mask]
             gt_columns[c] = gt
-            val_columns[c] =  val.loc[mask, c]
+            val_columns[c] = val.loc[mask, c]
     res = {}
+    counts = {}
     for c in columns:
         val, gt = val_columns[c], gt_columns[c]
         if per_sample:
-            val = {sample:val for sample,val in val.groupby('sample')}
-            gt = {sample:gt for sample,gt in gt.groupby('sample')}
+            val = {sample: val for sample, val in val.groupby("sample")}
+            gt = {sample: gt for sample, gt in gt.groupby("sample")}
             r = {}
+            cnt = {}
             for sample in gt.keys():
+                assert gt[sample].shape[0] == val[sample].shape[0]
+                cnt[sample] = gt[sample].shape[0]
                 r[sample] = metric(gt[sample], val[sample])
             res[c] = r
+            counts[c] = cnt
         else:
+            assert gt.shape[0] == val.shape[0]
+            counts[c] = gt.shape[0]
             res[c] = metric(gt, val)
-    return res
+    if return_counts:
+        return res, counts
+    else:
+        return res
 
-def compare_columns_with_gt_multi_datasets(datasets: List[Dataset],
-    columns: List[str], per_sample: bool =False, *args, **kwargs)->pd.DataFrame:
-    if 'dataset' in columns:
-        raise RuntimeError("The name 'dataset' is reserved for the output dataframe and cannot be the name of a column to compare")
+
+def compare_columns_with_gt_multi_datasets(
+    datasets: List[Dataset],
+    columns: List[str],
+    gt_column: str,
+    ids: Optional[List[pd.Index]] = None,
+    groups: Optional[List] = None,
+    per_sample: bool = False,
+    return_counts: bool = False,
+    *args,
+    **kwargs,
+) -> pd.DataFrame:
+    if "dataset" in columns:
+        raise RuntimeError(
+            "The name 'dataset' is reserved for the output dataframe and cannot be the name of a column to compare"
+        )
+    if "group" in columns and groups is not None:
+        raise RuntimeError(
+            "The name 'group' is reserved for the output dataframe and cannot be the name of a column to compare"
+        )
+    if groups is not None:
+        if len(groups) != len(datasets):
+            raise AttributeError("Lists datasets and groups must have same length")
+    if ids is not None:
+        if len(ids) != len(datasets):
+            raise AttributeError("Lists of ids indices and datasets must have same length")
     metrics_df = []
-    for i,dataset in enumerate(datasets):
-        metrics = compare_columns_with_gt(dataset=dataset, columns=columns, per_sample=per_sample, *args, **kwargs)
+    counts_df = []
+    for i, (dataset, ds_ids) in enumerate(zip(datasets, ids)):
+        metrics, counts = compare_columns_with_gt(
+            dataset=dataset,
+            columns=columns,
+            gt_column=gt_column,
+            ids=ds_ids,
+            per_sample=per_sample,
+            return_counts=True,
+            *args,
+            **kwargs,
+        )
         if per_sample:
-            metrics = {column: list(metric.values()) for column,metric in metrics.items()}
+            metrics = {column: list(metric.values()) for column, metric in metrics.items()}
+            counts = {column: list(counts.values()) for column, counts in counts.items()}
         else:
-            metrics = {column: [metric] for column,metric in metrics.items()}
+            metrics = {column: [metric] for column, metric in metrics.items()}
+            counts = {column: [counts] for column, counts in counts.items()}
         df = pd.DataFrame(metrics)
-        df['dataset']=i
+        df["dataset"] = i
+        if groups is not None:
+            df["group"] = groups[i]
         metrics_df.append(df)
-    metrics_df = pd.concat(metrics_df, ignore_index=True)
-    return metrics_df
+        counts_df.append(pd.DataFrame(counts))
+    metrics_df = pd.concat(metrics_df, ignore_index=True, sort=False)
+    if return_counts:
+        counts_df = pd.concat(counts_df, ignore_index=True, sort=False)
+        return metrics_df, counts_df
+    else:
+        return metrics_df

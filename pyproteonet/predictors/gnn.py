@@ -187,6 +187,7 @@ class GnnPredictor:
                     molecules = graph.nodes.loc[mask_nodes.nonzero(), "molecule_id"].values  # type: ignore
                     prediction = prediction.detach().numpy()
                     for i, c in enumerate(result_column):
+                        #print(sample.name, prediction.mean())
                         sample.values[mol].loc[molecules, c] = prediction[:, i]
 
     @property

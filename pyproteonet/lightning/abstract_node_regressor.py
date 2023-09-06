@@ -84,7 +84,8 @@ class AbstractNodeRegressor(pl.LightningModule):
         mask_nodes = graph.nodes["molecule"].data["mask"]
         # Loss
         abundances_train = target[mask_nodes]
-        abundances_train[abundances_train.isnan()] = self.nan_substitute_value
+        #abundances_train[abundances_train.isnan()] = self.nan_substitute_value
+        assert abundances_train.isnan().sum().item() == 0
         train_loss = self.calculate_loss(pred[mask_nodes], abundances_train)
         self._log_metrics(y=pred[mask_nodes], target=abundances_train, loss=train_loss, prefix="train")
         return train_loss
@@ -95,12 +96,14 @@ class AbstractNodeRegressor(pl.LightningModule):
         target = graph.nodes["molecule"].data["target"]
         mask_nodes = graph.nodes["molecule"].data["mask"]
         abundances_test = target[mask_nodes]
-        abundances_test[abundances_test.isnan()] = self.nan_substitute_value
+        #abundances_test[abundances_test.isnan()] = self.nan_substitute_value
+        assert abundances_test.isnan().sum().item() == 0
         val_loss = self.calculate_loss(pred[mask_nodes], abundances_test)
         self._log_metrics(y=pred[mask_nodes], target=abundances_test, loss=val_loss, prefix=f"validation")
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        return self(batch)
+        res = self(batch)
+        return res
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.model.parameters(), lr=self.lr)

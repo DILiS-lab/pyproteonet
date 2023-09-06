@@ -17,9 +17,10 @@ if TYPE_CHECKING:
 
 
 class DatasetSample:
-    def __init__(self, dataset: "Dataset", values: Dict[str, pd.DataFrame]):
+    def __init__(self, dataset: "Dataset", values: Dict[str, pd.DataFrame], name: str):
         self.dataset = dataset
         self.values = values
+        self.name = name
         # self._node_mapping = None
         # self._nodes = None
         # self._edges = None
@@ -39,7 +40,7 @@ class DatasetSample:
             else:
                 cs = [c for c in cs if c in df.keys()]
             new_values[molecule] = df.loc[:, list(cs)]
-        return DatasetSample(dataset=self.dataset, values=new_values)
+        return DatasetSample(dataset=self.dataset, values=new_values, name=self.name)
 
     def missing_mask(self, molecule: str, column: str = "abundance"):
         return eq_nan(self.values[molecule].loc[:, column], self.dataset.missing_value)

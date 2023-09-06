@@ -44,7 +44,7 @@ def iterative_impute(
     if max_value is None:
         max_value = dataset.values[molecule][column].max()
     imputer = IterativeImputer(missing_values=dataset.missing_value, keep_empty_features=False,
-                               min_value=min_value, max_value=max_value **kwargs)
+                               min_value=min_value, max_value=max_value, **kwargs)
     imputed = generic_matrix_imputation(
         dataset=dataset,
         molecule=molecule,
