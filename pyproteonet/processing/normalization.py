@@ -1,8 +1,28 @@
-from typing import List
+from typing import List, Optional
 
 import numpy as np
+import pandas as pd
 
 from ..data.dataset import Dataset
+
+
+def sum_normalize(
+    dataset: Dataset,
+    molecule: str,
+    column: str,
+    reference_ids: Optional[pd.Index] = None,
+    reference_sample=None,
+):
+    if reference_sample is None:
+        reference_sample = list(dataset.sample_names)[0]
+    values = dataset.get_column_flat(molecule=molecule, column=column, ids=reference_ids)
+    factors = values.groupby("sample").sum()
+    factors = factors[reference_sample] / factors
+    values = dataset.get_column_flat(molecule=molecule, column=column)
+    factors = values.index.get_level_values("sample").map(factors)
+    values = values * factors
+    return values
+
 
 class DnnNormalizer:
     def __init__(self, columns: List[str]):
@@ -10,7 +30,7 @@ class DnnNormalizer:
         self.means = {}
         self.stds = {}
 
-    def normalize(self, dataset: Dataset, inplace: bool = False)->Dataset:
+    def normalize(self, dataset: Dataset, inplace: bool = False) -> Dataset:
         if not inplace:
             dataset = dataset.copy()
         for mol in dataset.molecules.keys():
@@ -28,7 +48,7 @@ class DnnNormalizer:
             self.stds[mol] = col_stds
         return dataset
 
-    def unnormalize(self, dataset: Dataset, inplace: bool = False)->Dataset:
+    def unnormalize(self, dataset: Dataset, inplace: bool = False) -> Dataset:
         if not inplace:
             dataset = dataset.copy()
         for mol in dataset.molecules.keys():

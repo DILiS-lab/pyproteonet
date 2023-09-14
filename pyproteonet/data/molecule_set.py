@@ -146,7 +146,6 @@ class MoleculeSet:
                 _check_name(m1)
                 _check_name(m2)
                 identifier = f"mapping/{mapping_name}/{m1}/{m2}"
-                print(identifier)
                 store[identifier] = mapping.df
 
     def copy(self) -> "MoleculeSet":
@@ -171,8 +170,15 @@ class MoleculeSet:
         mapping = mapping.reset_index(drop=False)  # TODO: don't do this once everything is refactored
         return mapping
 
-    def _infer_mapping_name(self, molecule: str, mapping_name: str) -> str:
+    def infer_mapping(self, molecule: str, mapping: str) -> Tuple[str, str, str]:
+        mapping = self.infer_mapping_name(molecule=molecule, mapping_name=mapping)
+        partner = [n for n in self.mappings[mapping].mapping_molecules if n != molecule][0]
+        return molecule, mapping, partner
+
+    def infer_mapping_name(self, molecule: str, mapping_name: str) -> str:
         if mapping_name not in self.mappings and molecule is not None:
+            if molecule not in self.mappings_lookup:
+                raise KeyError(f"{molecule} is not a known molecule type, no mapping can be inferred")
             mapping_name = self.mappings_lookup[molecule][mapping_name]
             if len(mapping_name) != 1:
                 raise AttributeError(
@@ -182,9 +188,7 @@ class MoleculeSet:
         return mapping_name
 
     def get_mapping_partner(self, molecule: str, mapping: str) -> str:
-        mapping = self.mappings[self._infer_mapping_name(molecule=molecule, mapping_name=mapping)]
-        partner = [n for n in mapping.mapping_molecules if n != molecule]
-        return partner[0]
+        return self.infer_mapping(molecule=molecule, mapping=mapping)
 
     def get_mapping(
         self,
@@ -196,11 +200,13 @@ class MoleculeSet:
     )->MoleculeMapping:
         if molecule is not None and molecule not in self.molecules:
             raise KeyError(f"Molecule type {molecule} does not exist!")
-        mapping_name = self._infer_mapping_name(molecule=molecule, mapping_name=mapping_name)
+        mapping_name = self.infer_mapping_name(molecule=molecule, mapping_name=mapping_name)
         mapping = self.mappings[mapping_name]
         if molecule is not None:
             if molecule != mapping.mapping_molecules[0]:
                 mapping = mapping.swaplevel() 
+            else:
+                mapping = mapping.copy()
         else:
             mapping = mapping.copy()
             molecule = mapping.mapping_molecules[0]
@@ -217,11 +223,13 @@ class MoleculeSet:
                     )
         mol_vals = self.molecules[molecule].loc[mapping.df.index.get_level_values(0), molecule_columns]
         for mc in mol_vals:
+            mc=mol_vals[mc]
             mapping.df[mc.name] = mc.values
         mol_vals = self.molecules[partner_molecule].loc[
             mapping.df.index.get_level_values(1), partner_columns
         ]
         for mc in mol_vals:
+            mc=mol_vals[mc]
             mapping.df[mc.name] = mc.values
         return mapping
 

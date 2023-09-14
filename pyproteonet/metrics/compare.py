@@ -15,6 +15,8 @@ def _get_metric_from_str(metric: str):
         res = lambda val, gt: spearmanr(val, gt)[0]
     elif metric == "mse":
         res = lambda val, gt: ((val - gt) ** 2).mean()
+    elif metric == "mae":
+        res = lambda val, gt: ((val - gt).abs()).mean()
     elif metric == "rmse":
         res = lambda val, gt: (((val - gt) ** 2).mean()) ** 0.5
     else:
@@ -51,10 +53,12 @@ def compare_columns_with_gt(
     val_missing = {c: val[c].isna() for c in columns}
     if logarithmize:
         val, gt = np.log(val), np.log(gt)
-    if not ignore_missing and (any([vm.sum() > 0 for vm in val_missing.values()]) or gt_missing.sum() > 0):
-        raise ValueError(
-            "There are missing values in the column or ground truth. If you want to ignore them set ignore_missing_values."
-        )
+    missing_value_columns = [c for c, vm in val_missing.items() if vm.any()]
+    if not ignore_missing and (len(missing_value_columns) or gt_missing.any()):
+        if len(missing_value_columns):
+            raise ValueError(f"There are value columns with missing values: {missing_value_columns}")
+        if gt_missing.any():
+            raise ValueError(f"The ground truth column {gt_column} has missing values")
     else:
         gt_columns = {}
         val_columns = {}

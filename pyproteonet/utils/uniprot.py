@@ -191,9 +191,9 @@ class UniprotMapper:
         ids = ids.drop_duplicates()
         ids_t = (pd.Series(ids.index.values, index=ids))
         job_id = self.submit_id_mapping(from_db=from_db, to_db=to_db, ids=list(ids_t.index))
-        if self.check_id_mapping_results_ready(job_id, verbose=verbose):
-            link = self.get_id_mapping_results_link(job_id)
-            results = self.get_id_mapping_results_search(link, verbose=verbose)
+        #if self.check_id_mapping_results_ready(job_id, verbose=verbose):
+        link = self.get_id_mapping_results_link(job_id)
+        results = self.get_id_mapping_results_search(link, verbose=verbose)
         # Equivalently using the stream endpoint which is more demanding
         # on the API and so is less stable:
         # results = get_id_mapping_results_stream(link)

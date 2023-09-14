@@ -127,6 +127,7 @@ class Dataset:
             if mol not in values:
                 values[mol] = pd.DataFrame(index=mol_df.index)
             else:
+                assert values[mol].index.isin(mol_df.index).all()
                 values[mol] = pd.DataFrame(data=values[mol], index=mol_df.index)
             values[mol].index.name = "id"
         for key, vals in [(key, vals) for key, vals in values.items() if key not in self.molecules.keys()]:
@@ -196,13 +197,17 @@ class Dataset:
             return values, np.concatenate(mask)
         return values
 
-    def get_values_flat(self, molecule: str, columns: Optional[List[str]] = None):
+    def get_values_flat(self, molecule: str, columns: Optional[List[str]] = None, molecule_columns: List[str] = []):
         sample_names, df = [], []
         for name, sample in self.samples_dict.items():
             if columns is None:
-                values = sample.values[molecule]
+                values = sample.values[molecule].copy()
             else:
-                values = sample.values[molecule][columns]
+                values = sample.values[molecule][columns].copy()
+            if molecule_columns:
+                if set.intersection(set(values.columns), set(molecule_columns)):
+                    raise AttributeError('There are columns and molecule columns with identical name')
+                values[molecule_columns] = self.molecules[molecule][molecule_columns]
             sample_names.extend(np.full(len(values), name))
             df.append(values)
         df = pd.concat(df)
@@ -210,6 +215,9 @@ class Dataset:
         index = pd.MultiIndex.from_frame(index)
         df.set_index(index, inplace=True)
         return df
+    
+    def infer_mapping(self, molecule: str, mapping: str)->Tuple[str, str, str]:
+        return self.molecule_set.infer_mapping(molecule=molecule, mapping=mapping)
     
     def get_mapping_partner(self, molecule: str, mapping: str)->str:
         return self.molecule_set.get_mapping_partner(molecule=molecule, mapping=mapping)
@@ -283,7 +291,8 @@ class Dataset:
     def non_missing_mask(self, molecule: str, column: str = "abundance"):
         return ~self.missing_mask(molecule=molecule, column=column)
 
-    def set_column_flat(self, molecule: str, values: pd.Series, column: Optional[str] = None):
+    def set_column_flat(self, molecule: str, values: pd.Series, column: Optional[str] = None, allow_foreign_ids: bool = False,
+                        fill_missing:bool=False):
         """Sets values from a Pandas Series which has a MultiIndex with the levels: "id" and "sample"
 
         Args:
@@ -297,8 +306,11 @@ class Dataset:
         for name, group in values.groupby("sample"):
             group = group.droplevel(level="sample")
             sample_values = self.samples_dict[name].values[molecule]
-            #import pdb; pdb.set_trace()
-            assert group.index.isin(sample_values.index).all()
+            if not allow_foreign_ids and not group.index.isin(sample_values.index).all():
+                raise KeyError("Some of the provided values have ids that do not exist for this molecule."
+                               " If you want to ignore those set the allow_foreign_ids attribute.")
+            if fill_missing:
+                sample_values[column] = self.missing_value
             sample_values[column] = group
 
     def get_samples_value_matrix(self, molecule: str, column: str = "abundance", molecule_columns: Union[bool, List[str]] = [],

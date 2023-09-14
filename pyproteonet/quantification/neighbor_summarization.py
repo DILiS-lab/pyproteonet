@@ -1,4 +1,4 @@
-from typing import Union, Callable
+from typing import Union, Callable, Optional
 
 import pandas as pd
 from pandas.core.groupby.generic import SeriesGroupBy
@@ -14,8 +14,8 @@ def _get_mapped(
     top_n: int = 3,
     only_unique: bool = True,
 )->pd.DataFrame:
+    molecule, mapping, partner_molecule = dataset.infer_mapping(molecule=molecule, mapping=mapping)
     mapped = dataset.get_mapped(molecule=molecule, partner_columns=[partner_column], mapping=mapping)
-    partner_molecule = dataset.get_mapping_partner(molecule=molecule, mapping=mapping)
     mapped.rename(columns={partner_column:'quanti'}, inplace=True)
     degs = dataset.molecule_set.get_mapping_degrees(molecule=partner_molecule, mapping=mapping)
     mapped['deg'] = degs.loc[mapped.index.get_level_values(level=partner_molecule)].values
@@ -61,9 +61,12 @@ def neighbor_top_n_mean(
     partner_column: str,
     top_n: int = 3,
     only_unique: bool = True,
-)->pd.Series:
+    result_column: Optional[str] = None
+)->Optional[pd.Series]:
     mapped = _get_mapped(dataset=dataset, molecule=molecule, mapping=mapping, partner_column=partner_column, only_unique=only_unique)
     group = mapped.quanti.sort_values(ascending=False).groupby(['sample', molecule]).head(top_n).groupby(['sample',molecule])
     res = group.mean()[group.count() >= top_n]
     res.index.set_names('id', level=1, inplace=True)
+    if result_column is not None:
+        dataset.set_column_flat(molecule=molecule, values=res, column=result_column, fill_missing=True)
     return res

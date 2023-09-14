@@ -129,7 +129,6 @@ def across_datasets_metric_multi_boxplot(
         axs = axs.flatten()
     if isinstance(gt_columns, str):
         gt_columns = {key:gt_columns for key in ids.keys()}
-    metrics_dfs = dict()
     for ax, (key, ids_list) in zip(axs, ids.items()):
         if not isinstance(ids_list, list):
             ids_list = [ids_list] * len(datasets)
@@ -177,6 +176,7 @@ def across_datasets_metric_multi_boxplot_grouped(
         gt_columns = {key:gt_columns for key in ids.keys()}
     metrics_df = []
     for key, ids_list in ids.items():
+        print(key)
         if not isinstance(ids_list, list):
             ids_list = [ids_list] * len(datasets)
         if len(datasets) != len(ids_list):
@@ -211,6 +211,7 @@ def across_datasets_metric_multi_boxplot_grouped(
             y = metric
         sns.boxplot(data=metrics_df_group, x=group_level, y=y, hue=hue_level, ax=ax)
         _boxplot_fill_color_to_line_color(ax=ax)
+        ax.grid(which='both', axis='y')
         ax.set_title(key)
     return metrics_df
 

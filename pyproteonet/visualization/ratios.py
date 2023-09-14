@@ -1,11 +1,68 @@
 from typing import List, Optional, Iterable, Union, Tuple
 from warnings import warn
+import math
 
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import gaussian_kde
 
 from ..data.dataset import Dataset
+
+
+def plot_ratio_scatter(
+    dataset: Dataset,
+    molecule: str,
+    columns: List[str],
+    high_samples: List[str],
+    low_samples: List[str],
+    categories: Optional[pd.Series] = None,
+    axs_columns: int = 4,
+    axs: Optional[List[plt.Axes]] = None,
+    ids: Optional[pd.Index] = None,
+    plot_density: bool = False,
+    s: float = 10,
+):
+    markers = ["o", "x", "D", "^", "v"]
+    if categories is None:
+        unique_categories = [0]
+    else:
+        unique_categories = categories.unique()
+    if plot_density and len(unique_categories) > len(markers):
+        raise AttributeError("Plotting density is not supported with more than {len(markers)} categories yet")
+    fig_rows = math.ceil(len(columns) / axs_columns)
+    if axs is None:
+        fig, axs = plt.subplots(fig_rows, axs_columns, figsize=(13, 10))
+        axs = axs.flatten()
+    for col, ax in zip(columns, axs):
+        vals = dataset.values[molecule][col].unstack(level="sample")
+        if ids is not None:
+            vals = vals.loc[ids]
+        vals_high = vals[high_samples]
+        vals_low = vals[low_samples]
+        vals_high = vals_high.median(axis=1)
+        vals_low = vals_low.median(axis=1)
+        ratio = np.log2(vals_high / vals_low)
+        log_abundance = np.log((vals_high + vals_low) / 2)
+        non_na_mask = ~ratio.isna()
+        for i, gt_ratio in enumerate(unique_categories):
+            if categories is not None:
+                mask = non_na_mask & (categories == gt_ratio)
+            else:
+                mask = non_na_mask
+            ratio_plot = ratio[mask]
+            log_abundance_plot = log_abundance[mask]
+            if plot_density:
+                xy = np.vstack([ratio_plot, log_abundance_plot])
+                z = gaussian_kde(xy)(xy)
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, c=z, label=f"gt ratio {gt_ratio}", marker=markers[i])
+            else:
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, label=f"gt ratio {gt_ratio}")
+            ax.set_xlabel("log2 ratio")
+            ax.set_ylabel("log abundance")
+        ax.legend()
+        ax.set_title(col)
+    return ratio_plot, log_abundance_plot
 
 
 def plot_ratios_volcano(
@@ -96,7 +153,7 @@ def plot_ratios_difference_volcano(
     log_base: int = 10,
     ratio_log_base: int = 2,
     ax: Optional[plt.Axes] = None,
-    scatter_colors: List[Union[str, Tuple[float, float ,float]]] = ["orange", "green"],
+    scatter_colors: List[Union[str, Tuple[float, float, float]]] = ["orange", "green"],
     point_size: float = 2,
     label_percentage_missing: bool = True,
 ):
@@ -111,14 +168,15 @@ def plot_ratios_difference_volcano(
     means = []
     labels = group_names if group_names is not None else [None] * len(molecule_groups)
     if label_percentage_missing:
-            labels_new = []
-            for group, label in zip(molecule_groups, labels):
-                if label is None:
-                    label = ''
-                vals, mask = dataset.get_column_flat(molecule=molecule, column=column, samples=samples_a + samples_b,
-                                                     ids=group, return_missing_mask=True)
-                labels_new.append(label + f' ({mask.sum() / vals.shape[0] * 100:.2f}% missing)')
-            labels = labels_new
+        labels_new = []
+        for group, label in zip(molecule_groups, labels):
+            if label is None:
+                label = ""
+            vals, mask = dataset.get_column_flat(
+                molecule=molecule, column=column, samples=samples_a + samples_b, ids=group, return_missing_mask=True
+            )
+            labels_new.append(label + f" ({mask.sum() / vals.shape[0] * 100:.2f}% missing)")
+        labels = labels_new
     for ids, color, label in zip(molecule_groups, scatter_colors, labels):
         mean = plot_ratios_volcano(
             dataset=dataset,
@@ -135,7 +193,7 @@ def plot_ratios_difference_volcano(
             label=label,
             plot_missing=False,
             return_mean=True,
-            point_size=point_size
+            point_size=point_size,
         )
         means.append(mean)
     if ratio_log_base is not None:
@@ -145,13 +203,15 @@ def plot_ratios_difference_volcano(
             ax.annotate("", xy=start, xytext=end, arrowprops=dict(arrowstyle="<->"), xycoords=("data", "axes fraction"))
             diff = round(means[i + 1] - means[i], 2)
             ax.annotate(
-                str(diff) + f'\n({ratio_log_base}^{diff}={round(ratio_log_base**diff, 2)})' if ratio_log_base is not None else '',
+                str(diff) + f"\n({ratio_log_base}^{diff}={round(ratio_log_base**diff, 2)})"
+                if ratio_log_base is not None
+                else "",
                 xy=((means[i + 1] + means[i]) / 2, 0.9),
                 size=12,
-                weight='bold',
+                weight="bold",
                 xycoords=("data", "axes fraction"),
                 horizontalalignment="center",
-                verticalalignment='bottom'
+                verticalalignment="bottom",
             )
     if group_names is not None:
         ax.legend()
