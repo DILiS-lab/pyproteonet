@@ -32,12 +32,14 @@ def create_toy_dataset()->Dataset:
         10:5.0,
         11:2.0,
         12:1.0,
+        13:3.0
     }
     peptide_values_sample1 = pd.DataFrame({'abundance':pd.Series(peptide_values_sample1)})
     peptide_values_sample2 = peptide_values_sample1 * 2
     peptide_protein_mapping = [(0, 'A'), (1, 'A'), (2, 'A'), (3, 'A'),  (4, 'A'),  (7, 'A'),
-                               (4, 'B'), (7, 'B'), (5, 'B'), (6, 'B'), 
-                               (8, 'C'), (9, 'C'), (10, 'C'), (11, 'C'), (12, 'C')
+                               (4, 'B'), (7, 'B'), (5, 'B'), (6, 'B'), (13, 'B'), 
+                               (8, 'C'), (9, 'C'), (10, 'C'), (11, 'C'), (12, 'C'),
+                               (13, 'D')
                               ]
     peptide_protein_mapping = pd.DataFrame(peptide_protein_mapping, columns=['peptide', 'protein'])
     peptide_protein_mapping.set_index(['peptide', 'protein'], inplace=True)

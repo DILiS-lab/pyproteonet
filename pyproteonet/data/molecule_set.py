@@ -20,24 +20,27 @@ class MoleculeMapping:
         if mapping_molecules is None:
             mapping_molecules = tuple(df.index.names)
         else:
-            if mapping_molecules[0]!=mapping_molecules[1]:
+            if mapping_molecules[0] != mapping_molecules[1]:
                 assert mapping_molecules[0] == df.index.names[0] and mapping_molecules[1] == df.index.names[1]
             else:
-                assert mapping_molecules[0]+'_a' == df.index.names[0] and mapping_molecules[1]+'_b' == df.index.names[1]
+                assert (
+                    mapping_molecules[0] + "_a" == df.index.names[0]
+                    and mapping_molecules[1] + "_b" == df.index.names[1]
+                )
         self.mapping_molecules = mapping_molecules
 
     def copy(self):
         return MoleculeMapping(name=self.name, df=self.df.copy(), mapping_molecules=self.mapping_molecules)
-    
+
     def add_pairs(self, pairs: pd.DataFrame):
         pairs = pairs.copy()
         pairs.index.set_names(self.df.index.names, inplace=True)
         self.df = pd.concat([self.df, pairs])
 
-    def rename_molecule(self, molecule:str, new_name: str):
-        self.mapping_molecules = tuple([(new_name if m==molecule else m) for m in self.mapping_molecules])
+    def rename_molecule(self, molecule: str, new_name: str):
+        self.mapping_molecules = tuple([(new_name if m == molecule else m) for m in self.mapping_molecules])
         if self.mapping_molecules[0] == self.mapping_molecules[1]:
-            self.df.index.set_names((self.mapping_molecules[0]+'_a', self.mapping_molecules[1]+'_b'), inplace=True)
+            self.df.index.set_names((self.mapping_molecules[0] + "_a", self.mapping_molecules[1] + "_b"), inplace=True)
         else:
             self.df.index.set_names(self.mapping_molecules, inplace=True)
 
@@ -46,9 +49,7 @@ class MoleculeMapping:
         df = self.df.swaplevel()
         return MoleculeMapping(name=self.name, df=df, mapping_molecules=mapping_molecules)
 
-    def validate_for_molecule_set(
-        self, molecule_set: 'MoleculeSet'
-    ):
+    def validate_for_molecule_set(self, molecule_set: "MoleculeSet"):
         assert len(self.df.index.names) == 2
         assert all([m in molecule_set.molecules for m in self.mapping_molecules])
         if self.name in molecule_set.molecules:
@@ -58,7 +59,6 @@ class MoleculeMapping:
         assert self.df.index.get_level_values(0).isin(molecule_set.molecules[self.mapping_molecules[0]].index).all()
         assert self.df.index.get_level_values(1).isin(molecule_set.molecules[self.mapping_molecules[1]].index).all()
         assert self.df.index.is_unique
-
 
 
 def _check_name(name: str):
@@ -117,14 +117,18 @@ class MoleculeSet:
             for key in molecule_keys:
                 molecules[key.split("/")[-1]] = store[key]
             for key in mapping_keys:
-                if len(key.split('/')) == 5:
-                    _, _, mapping_name, m1, m2 = key.split('/')
+                if len(key.split("/")) == 5:
+                    _, _, mapping_name, m1, m2 = key.split("/")
                     print(mapping_name, m1, m2)
-                    mappings[mapping_name] = MoleculeMapping(name=mapping_name, df=store[key], mapping_molecules=(m1,m2))
-                elif len(key.split('/')) == 3:#legacy format
-                    mapping_name = key.split('/')[-1]
+                    mappings[mapping_name] = MoleculeMapping(
+                        name=mapping_name, df=store[key], mapping_molecules=(m1, m2)
+                    )
+                elif len(key.split("/")) == 3:  # legacy format
+                    mapping_name = key.split("/")[-1]
                     mapping = store[key]
-                    mappings[mapping_name] = MoleculeMapping(name=mapping_name, df=store[key], mapping_molecules=tuple(mapping.index.names))
+                    mappings[mapping_name] = MoleculeMapping(
+                        name=mapping_name, df=store[key], mapping_molecules=tuple(mapping.index.names)
+                    )
                 else:
                     raise RuntimeError("MoleculeSet data format not understood.")
         return cls(molecules=molecules, mappings=mappings)
@@ -160,7 +164,7 @@ class MoleculeSet:
     def number_molecules(self, molecule: str) -> int:
         return len(self.molecules[molecule])
 
-    def get_mapped_pairs(self, mapping: str, molecule_a: str = None, molecule_b: str = None)->pd.DataFrame:
+    def get_mapped_pairs(self, mapping: str, molecule_a: str = None, molecule_b: str = None) -> pd.DataFrame:
         mapping = self.mappings[mapping]
         if molecule_a is not None and molecule_b is not None:
             assert molecule_a in mapping.mapping_molecules and molecule_b in mapping.mapping_molecules
@@ -197,20 +201,22 @@ class MoleculeSet:
         molecule_columns: List[str] = [],
         partner_columns: List[str] = [],
         partner_molecule: str = None,
-    )->MoleculeMapping:
+    ) -> MoleculeMapping:
         if molecule is not None and molecule not in self.molecules:
             raise KeyError(f"Molecule type {molecule} does not exist!")
         mapping_name = self.infer_mapping_name(molecule=molecule, mapping_name=mapping_name)
         mapping = self.mappings[mapping_name]
         if molecule is not None:
             if molecule != mapping.mapping_molecules[0]:
-                mapping = mapping.swaplevel() 
+                mapping = mapping.swaplevel()
             else:
                 mapping = mapping.copy()
         else:
             mapping = mapping.copy()
             molecule = mapping.mapping_molecules[0]
-        assert molecule == mapping.mapping_molecules[0] and (partner_molecule is None or partner_molecule == mapping.mapping_molecules[1])
+        assert molecule == mapping.mapping_molecules[0] and (
+            partner_molecule is None or partner_molecule == mapping.mapping_molecules[1]
+        )
         molecule, partner_molecule = mapping.mapping_molecules
         if molecule is not None:
             partner = [n for n in mapping.mapping_molecules if n != molecule]
@@ -223,13 +229,11 @@ class MoleculeSet:
                     )
         mol_vals = self.molecules[molecule].loc[mapping.df.index.get_level_values(0), molecule_columns]
         for mc in mol_vals:
-            mc=mol_vals[mc]
+            mc = mol_vals[mc]
             mapping.df[mc.name] = mc.values
-        mol_vals = self.molecules[partner_molecule].loc[
-            mapping.df.index.get_level_values(1), partner_columns
-        ]
+        mol_vals = self.molecules[partner_molecule].loc[mapping.df.index.get_level_values(1), partner_columns]
         for mc in mol_vals:
-            mc=mol_vals[mc]
+            mc = mol_vals[mc]
             mapping.df[mc.name] = mc.values
         return mapping
 
@@ -240,18 +244,39 @@ class MoleculeSet:
         molecule_columns: List[str] = [],
         partner_columns: List[str] = [],
         partner_molecule: str = None,
-    )->pd.DataFrame:
-        mapping = self.get_mapping(mapping_name=mapping_name, molecule=molecule, molecule_columns=molecule_columns, 
-                                   partner_columns=partner_columns, partner_molecule=partner_molecule)
+    ) -> pd.DataFrame:
+        mapping = self.get_mapping(
+            mapping_name=mapping_name,
+            molecule=molecule,
+            molecule_columns=molecule_columns,
+            partner_columns=partner_columns,
+            partner_molecule=partner_molecule,
+        )
         return mapping.df
 
     def get_mapping_degrees(
-        self, molecule: str, mapping: str, result_column: Optional[str] = None, partner_molecule: str = None
+        self,
+        molecule: str,
+        mapping: str,
+        result_column: Optional[str] = None,
+        partner_molecule: str = None,
+        only_unique: bool = False,
     ):
+        molecule, mapping, partner = self.infer_mapping(molecule=molecule, mapping=mapping)
+        if partner_molecule is not None:
+            assert partner_molecule == partner
+        else:
+            partner_molecule = partner
         mapped = self.get_mapped(mapping_name=mapping, molecule=molecule, partner_molecule=partner_molecule)
         res = pd.Series(data=0, index=self.molecules[molecule].index)
         mapped["deg"] = 1
-        degs = mapped.groupby(molecule)["deg"].count()
+        if only_unique:
+            if molecule == partner_molecule:
+                raise AttributeError('Only_unique not supported for mappings between only one molecule type are not supported!')
+            mapped["partner_deg"] = 1
+            partner_degs = mapped.groupby(partner_molecule)["partner_deg"].count()
+            mapped[mapped.index.get_level_values(partner_molecule).isin(partner_degs[partner_degs>1].index)] = 0
+        degs = mapped.groupby(molecule)["deg"].sum()
         res.loc[degs.index] = degs
         if result_column is not None:
             self.molecules[molecule][result_column] = res
@@ -331,7 +356,7 @@ class MoleculeSet:
             lookup[molecules[0]] = lookup.get(molecules[0], []) + [mapping_name]
             self.mappings_lookup[molecules[1]] = lookup
 
-    def add_mapping_pairs(self, name: str, pairs: pd.DataFrame, mapping_molecules: Optional[Tuple[str,str]]):
+    def add_mapping_pairs(self, name: str, pairs: pd.DataFrame, mapping_molecules: Optional[Tuple[str, str]]):
         if name not in self.mappings:
             mapping = MoleculeMapping(name=name, df=pairs, mapping_molecules=mapping_molecules)
             mapping.validate_for_molecule_set(molecule_set=self)

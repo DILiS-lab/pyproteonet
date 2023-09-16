@@ -11,7 +11,6 @@ def _get_mapped(
     molecule: str,
     mapping: str,
     partner_column: str,
-    top_n: int = 3,
     only_unique: bool = True,
 )->pd.DataFrame:
     molecule, mapping, partner_molecule = dataset.infer_mapping(molecule=molecule, mapping=mapping)
