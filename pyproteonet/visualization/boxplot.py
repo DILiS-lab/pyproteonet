@@ -19,6 +19,7 @@ def plot_per_sample_metric_boxplot(
     ignore_missing: bool = True,
     ids: Optional[pd.Index] = None,
     logarithmize: bool = True,
+    replace_nan_metric_with: Optional[float] = None,
     tick_labels: Optional[List[str]] = None,
     print_missingness: bool = True,
     ax: Optional[plt.Axes] = None,
@@ -35,6 +36,7 @@ def plot_per_sample_metric_boxplot(
         ids=ids,
         logarithmize=logarithmize,
         per_sample=True,
+        replace_nan_metric_with=replace_nan_metric_with,
     )
     tlabels = []
     for i, column in enumerate(columns):
@@ -61,6 +63,7 @@ def across_datasets_metric_boxplot(
     ids: Optional[List[pd.Index]] = None,
     per_sample: bool = True,
     logarithmize: bool = True,
+    replace_nan_metric_with: Optional[float] = None,
     print_missingness: bool = True,
     ax: Optional[plt.Axes] = None,
 ):
@@ -80,6 +83,7 @@ def across_datasets_metric_boxplot(
         groups = groups,
         logarithmize=logarithmize,
         per_sample=per_sample,
+        replace_nan_metric_with=replace_nan_metric_with
     )
     del metrics_df['dataset']
     tlabels = []
@@ -145,6 +149,7 @@ def across_datasets_metric_multi_boxplot_grouped(
     logarithmize: bool = True,
     ignore_missing: bool = False,
     metric: Union[str, Callable] = 'PearsonR',
+    replace_nan_metric_with: Optional[float] = None,
     axs: Optional[plt.Axes] = None,
     axes_level: Literal['group', 'ids', 'column'] = 'ids',
     group_level: Literal['group', 'ids', 'column'] = 'group',
@@ -193,6 +198,7 @@ def across_datasets_metric_multi_boxplot_grouped(
             per_sample=per_sample,
             logarithmize=logarithmize,
             ignore_missing=ignore_missing,
+            replace_nan_metric_with=replace_nan_metric_with,
             return_counts=True
         )
         metrics_df_ids['ids'] = key

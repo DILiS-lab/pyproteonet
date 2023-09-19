@@ -239,14 +239,14 @@ class MoleculeSet:
 
     def get_mapped(
         self,
-        mapping_name: str,
+        mapping: str,
         molecule: str = None,
         molecule_columns: List[str] = [],
         partner_columns: List[str] = [],
         partner_molecule: str = None,
     ) -> pd.DataFrame:
         mapping = self.get_mapping(
-            mapping_name=mapping_name,
+            mapping_name=mapping,
             molecule=molecule,
             molecule_columns=molecule_columns,
             partner_columns=partner_columns,
@@ -267,7 +267,7 @@ class MoleculeSet:
             assert partner_molecule == partner
         else:
             partner_molecule = partner
-        mapped = self.get_mapped(mapping_name=mapping, molecule=molecule, partner_molecule=partner_molecule)
+        mapped = self.get_mapped(mapping=mapping, molecule=molecule, partner_molecule=partner_molecule)
         res = pd.Series(data=0, index=self.molecules[molecule].index)
         mapped["deg"] = 1
         if only_unique:

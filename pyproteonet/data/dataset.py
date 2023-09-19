@@ -12,9 +12,11 @@ from scipy.stats import pearsonr  # type: ignore
 from pathlib import Path
 import json
 
+
 from .molecule_set import MoleculeSet
 from .dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
+from ..utils.pandas import matrix_to_multiindex
 from ..processing.dataset_transforms import rename_values, drop_values
 
 
@@ -300,9 +302,8 @@ class Dataset:
     ):
         vals = self.get_samples_value_matrix(
             molecule=molecule, column=column, molecule_columns=[], samples=samples, ids=ids
-        ).stack(dropna=False)
-        vals.index.set_names(["id", "sample"], inplace=True)
-        vals = vals.swaplevel()
+        )
+        vals = matrix_to_multiindex(vals)
         if drop_sample_id:
             vals.reset_index(level="sample", drop=True, inplace=True)
         if return_missing_mask:

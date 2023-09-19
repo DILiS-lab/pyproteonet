@@ -35,6 +35,7 @@ def compare_columns_with_gt(
     logarithmize: bool = True,
     per_sample: bool = False,
     return_counts: bool = False,
+    replace_nan_metric_with: Optional[float] = None
 ) -> Dict[str, float]:
     if isinstance(metric, str):
         metric = _get_metric_from_str(metric)
@@ -46,7 +47,7 @@ def compare_columns_with_gt(
             concat = []
             for sample_name in dataset.sample_names:
                 concat.append(pd.DataFrame({"sample": sample_name, "id": ids}))
-            ids = pd.concat(concat).set_index(("sample", "id"))
+            ids = pd.MultiIndex.from_frame(pd.concat(concat))
         val = val[val.index.isin(ids)]
         gt = gt[gt.index.isin(ids)]
     gt_missing = gt.isna()
@@ -79,7 +80,10 @@ def compare_columns_with_gt(
             for sample in gt.keys():
                 assert gt[sample].shape[0] == val[sample].shape[0]
                 cnt[sample] = gt[sample].shape[0]
-                r[sample] = metric(gt[sample], val[sample])
+                met = metric(gt[sample], val[sample])
+                if replace_nan_metric_with is not None and np.isnan(met):
+                    met = replace_nan_metric_with
+                r[sample] = met
             res[c] = r
             counts[c] = cnt
         else:

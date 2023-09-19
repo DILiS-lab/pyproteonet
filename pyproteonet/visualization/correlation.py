@@ -3,8 +3,23 @@ from typing import List, Callable, Optional, Union
 import numpy as np
 from scipy.stats import pearsonr
 from matplotlib import pyplot as plt
+import seaborn as sns
 
 from ..data.dataset import Dataset
+
+def plot_sample_correlation_matrix( dataset: Dataset, molecule: str, column: str, ax: Optional[plt.Axes] = None, samples: Optional[List[str]]=None,
+                                   annot=True, **kwargs):
+    mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
+    if samples is not None:
+        mat = mat[samples]
+    corr = mat.corr()
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+    if ax is None:
+        fig, ax = plt.subplots()
+    sns.heatmap(corr, mask=mask, center=0, annot=annot, linewidths=.5, **kwargs, ax=ax)
+    ax.set_xlabel('Sample')
+    ax.set_ylabel('Sample')
+    ax.set_title("Pearson Correlation Between Samples")
 
 def plot_correlation_boxplot(
     dataset: Dataset,
