@@ -20,6 +20,7 @@ def plot_ratio_scatter(
     axs_columns: int = 4,
     axs: Optional[List[plt.Axes]] = None,
     ids: Optional[pd.Index] = None,
+    logarithmize: bool = True,
     plot_density: bool = False,
     s: float = 10,
 ):
@@ -43,23 +44,26 @@ def plot_ratio_scatter(
         vals_high = vals_high.median(axis=1)
         vals_low = vals_low.median(axis=1)
         ratio = np.log2(vals_high / vals_low)
-        log_abundance = np.log((vals_high + vals_low) / 2)
+        abundance = (vals_high + vals_low) / 2
+        if logarithmize:
+            abundance = np.log(abundance)
         non_na_mask = ~ratio.isna()
-        for i, gt_ratio in enumerate(unique_categories):
+        for i, category in enumerate(unique_categories):
             if categories is not None:
-                mask = non_na_mask & (categories == gt_ratio)
+                mask = non_na_mask & (categories == category)
             else:
                 mask = non_na_mask
             ratio_plot = ratio[mask]
-            log_abundance_plot = log_abundance[mask]
+            log_abundance_plot = abundance[mask]
             if plot_density:
                 xy = np.vstack([ratio_plot, log_abundance_plot])
                 z = gaussian_kde(xy)(xy)
-                ax.scatter(ratio_plot, log_abundance_plot, s=s, c=z, label=f"gt ratio {gt_ratio}", marker=markers[i])
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, c=z, label=f"{category}", marker=markers[i])
             else:
-                ax.scatter(ratio_plot, log_abundance_plot, s=s, label=f"gt ratio {gt_ratio}")
-            ax.set_xlabel("log2 ratio")
-            ax.set_ylabel("log abundance")
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, label=f"{category}")
+            ax.set_xlabel("$Log_2$(ratio)")
+            if logarithmize:
+                ax.set_ylabel("$Log_e$(abundance)")
         ax.legend()
         ax.set_title(col)
     return ratio_plot, log_abundance_plot

@@ -32,7 +32,7 @@ def plot_mapping_degree_distribution(dataset: Dataset, molecule: str, mapping: s
     if cut_top_k:
         topk_height = degs_plot.Percentage.nlargest(n=cut_top_k+1).min() + 10
         ax.set_ylim(0, topk_height)
-    sbn.barplot(degs_plot, x='Degree', y='Percentage', hue='Type', ax=ax)
+    sbn.barplot(degs_plot, x='Degree', y='Percentage', hue='Type', ax=ax, hue_order=['Shared', 'Unique', 'All'])
     for container in ax.containers:
         heights = []
         for bar in container:

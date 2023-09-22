@@ -29,8 +29,13 @@ class MoleculeMapping:
                 )
         self.mapping_molecules = mapping_molecules
 
-    def copy(self):
-        return MoleculeMapping(name=self.name, df=self.df.copy(), mapping_molecules=self.mapping_molecules)
+    def copy(self, molecule_ids: Dict[str, pd.Index] = {}):
+        df = self.df.copy()
+        if self.mapping_molecules[0] in molecule_ids:
+            df = df[df.index.get_level_values(0).isin(molecule_ids[self.mapping_molecules[0]])]
+        if self.mapping_molecules[1] in molecule_ids:
+            df = df[df.index.get_level_values(1).isin(molecule_ids[self.mapping_molecules[1]])]
+        return MoleculeMapping(name=self.name, df=df, mapping_molecules=self.mapping_molecules)
 
     def add_pairs(self, pairs: pd.DataFrame):
         pairs = pairs.copy()
@@ -119,7 +124,6 @@ class MoleculeSet:
             for key in mapping_keys:
                 if len(key.split("/")) == 5:
                     _, _, mapping_name, m1, m2 = key.split("/")
-                    print(mapping_name, m1, m2)
                     mappings[mapping_name] = MoleculeMapping(
                         name=mapping_name, df=store[key], mapping_molecules=(m1, m2)
                     )
@@ -152,13 +156,15 @@ class MoleculeSet:
                 identifier = f"mapping/{mapping_name}/{m1}/{m2}"
                 store[identifier] = mapping.df
 
-    def copy(self) -> "MoleculeSet":
+    def copy(self, molecule_ids: Dict[str, pd.Index] = {}) -> "MoleculeSet":
         molecules = {}
         for n, v in self.molecules.items():
+            if n in molecule_ids:
+                v = v[v.index.isin(molecule_ids[n])]
             molecules[n] = v.copy()
         mappings = {}
         for mapping_name, mapping in self.mappings.items():
-            mappings[mapping_name] = mapping.copy()
+            mappings[mapping_name] = mapping.copy(molecule_ids=molecule_ids)
         return MoleculeSet(molecules=molecules, mappings=mappings)
 
     def number_molecules(self, molecule: str) -> int:
@@ -272,10 +278,12 @@ class MoleculeSet:
         mapped["deg"] = 1
         if only_unique:
             if molecule == partner_molecule:
-                raise AttributeError('Only_unique not supported for mappings between only one molecule type are not supported!')
+                raise AttributeError(
+                    "Only_unique not supported for mappings between only one molecule type are not supported!"
+                )
             mapped["partner_deg"] = 1
             partner_degs = mapped.groupby(partner_molecule)["partner_deg"].count()
-            mapped[mapped.index.get_level_values(partner_molecule).isin(partner_degs[partner_degs>1].index)] = 0
+            mapped[mapped.index.get_level_values(partner_molecule).isin(partner_degs[partner_degs > 1].index)] = 0
         degs = mapped.groupby(molecule)["deg"].sum()
         res.loc[degs.index] = degs
         if result_column is not None:

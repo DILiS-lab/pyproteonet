@@ -31,7 +31,7 @@ class DatasetSample:
     # def create_graph_nodes_edges(self):
     #     return self.molecule_set.create_graph_nodes_edges()
 
-    def copy(self, columns: Optional[Iterable[str]] = None):
+    def copy(self, columns: Optional[Iterable[str]] = None, molecule_ids: Dict[str, pd.Index] = {}):
         new_values = {}
         for molecule, df in self.values.items():
             cs = columns
@@ -39,7 +39,10 @@ class DatasetSample:
                 cs = df.keys()
             else:
                 cs = [c for c in cs if c in df.keys()]
-            new_values[molecule] = df.loc[:, list(cs)]
+            df = df.loc[:, list(cs)]
+            if molecule in molecule_ids:
+                df = df.loc[df.index.isin(molecule_ids[molecule])]
+            new_values[molecule] = df.copy()
         return DatasetSample(dataset=self.dataset, values=new_values, name=self.name)
 
     def missing_mask(self, molecule: str, column: str = "abundance"):

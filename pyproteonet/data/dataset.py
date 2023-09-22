@@ -132,7 +132,8 @@ class Dataset:
             if mol not in values:
                 values[mol] = pd.DataFrame(index=mol_df.index)
             else:
-                assert values[mol].index.isin(mol_df.index).all()
+                if not values[mol].index.isin(mol_df.index).all():
+                    raise ValueError(f"The dataframe for molecule {mol} contains an index which is not in the molecule set's molecule ids for {mol}.")
                 values[mol] = pd.DataFrame(data=values[mol], index=mol_df.index)
             values[mol].index.name = "id"
         for key, vals in [(key, vals) for key, vals in values.items() if key not in self.molecules.keys()]:
@@ -175,7 +176,11 @@ class Dataset:
         return Dataset(molecule_set=self.molecule_set, samples=transformed)
 
     def copy(
-        self, samples: Optional[List[str]] = None, columns: Optional[List[str]] = None, copy_molecule_set: bool = True
+        self,
+        samples: Optional[List[str]] = None,
+        columns: Optional[List[str]] = None,
+        copy_molecule_set: bool = True,
+        molecule_ids: Dict[str, pd.Index] = {},
     ):
         copied = {}
         samples_dict = self.samples_dict
@@ -183,11 +188,15 @@ class Dataset:
             samples = self.sample_names
         for name in samples:
             sample = samples_dict[name]
-            copied[name] = sample.copy(columns=columns)
+            copied[name] = sample.copy(columns=columns, molecule_ids=molecule_ids)
         molecule_set = self.molecule_set
         if copy_molecule_set:
-            molecule_set = molecule_set.copy()
+            molecule_set = molecule_set.copy(molecule_ids=molecule_ids)
         return Dataset(molecule_set=molecule_set, samples=copied)
+
+    def get_molecule_subset(
+        self, molecule: str, ids: pd.Index):
+        return self.copy(molecule_ids={molecule: ids}, copy_molecule_set=True)
 
     def all_values(self, molecule: str, column: str = "abundance", return_missing_mask: bool = False):
         values = []

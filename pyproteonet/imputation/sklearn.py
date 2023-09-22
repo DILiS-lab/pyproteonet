@@ -12,10 +12,15 @@ def generic_matrix_imputation(
     molecule: str,
     column: str,
     imputation_function: Callable[[np.ndarray], np.ndarray],
+    transpose: bool = False,
     **kwargs
 ) -> pd.Series:
     matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
+    if transpose:
+        matrix = matrix.to_numpy().T
     matrix_imputed = imputation_function(matrix, **kwargs)
+    if transpose:
+        matrix_imputed = matrix_imputed.T
     matrix_imputed = pd.DataFrame(matrix_imputed, columns=matrix.columns, index=matrix.index)
     assert matrix.shape == matrix_imputed.shape
     vals = matrix_imputed.stack().swaplevel()
