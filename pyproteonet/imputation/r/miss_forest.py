@@ -26,7 +26,7 @@ def impute_miss_forest(
     molecule: str,
     column: str,
     result_column: Optional[str] = None,
-    proteins_as_variables:bool = False,
+    proteins_as_variables:bool = True,
     ntree=100,
     **kwds
 ):
@@ -45,7 +45,6 @@ def impute_miss_forest(
     # else:
     #     parallelize = 'no'
     with (robjects.default_converter + numpy2ri.converter).context():
-        print(mat[:, mask].shape)
         imp = miss_forest.missForest(mat[:, mask], parallelize='no', ntree=ntree, **kwds)['ximp']
     mat[:, mask] = imp
     if proteins_as_variables:

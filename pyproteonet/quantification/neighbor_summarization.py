@@ -60,11 +60,15 @@ def neighbor_top_n_mean(
     partner_column: str,
     top_n: int = 3,
     only_unique: bool = True,
-    result_column: Optional[str] = None
+    result_column: Optional[str] = None,
+    skip_if_less_than_n: bool = True
 )->Optional[pd.Series]:
     mapped = _get_mapped(dataset=dataset, molecule=molecule, mapping=mapping, partner_column=partner_column, only_unique=only_unique)
     group = mapped.quanti.sort_values(ascending=False).groupby(['sample', molecule]).head(top_n).groupby(['sample',molecule])
-    res = group.mean()[group.count() >= top_n]
+    if skip_if_less_than_n:
+        res = group.mean()[group.count() >= top_n]
+    else:
+        res = group.mean()
     res.index.set_names('id', level=1, inplace=True)
     if result_column is not None:
         dataset.set_column_flat(molecule=molecule, values=res, column=result_column, fill_missing=True)

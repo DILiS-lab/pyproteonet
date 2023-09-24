@@ -35,6 +35,8 @@ def gnn_impute(
     predict_validation_ids: bool = False,
     silent: bool = False,
 ) -> Dataset:
+    if validation_ids is None and predict_validation_ids:
+        raise AttributeError("Cannot predict validation ids if validation_ids are not given")
     if result_column is None:
         result_column = column
     if not isinstance(result_column, (list, tuple)):
