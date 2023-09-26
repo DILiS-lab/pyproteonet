@@ -89,7 +89,7 @@ def simulate_mcars_sample(
     if amount > num_vals:
         raise ValueError(f"Only {num_vals} non missing values are in the sample but {amount} MCARS were requests!")
     if mask_only_non_missing:
-        mcar_mask = rng.choice(np.nonzero(mask)[0], size=amount, replace=False)
+        mcar_mask = rng.choice(np.nonzero(mask.values)[0], size=amount, replace=False)
     else:
         mcar_mask = rng.choice(mask.shape[0], size=amount, replace=False)
     mask[:] = False
