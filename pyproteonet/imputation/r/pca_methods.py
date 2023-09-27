@@ -1,5 +1,6 @@
 from typing import Optional, Literal
 
+import numpy as np
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
@@ -17,7 +18,7 @@ pca_methods = importr("pcaMethods")
 ms_core_utils = importr("MsCoreUtils")
 
 nan_to_na = robjects.r(
-    """nan_to_na <- function(mat){
+"""function(mat){
     replace(mat, is.na(mat), NA)
 }"""
 )
@@ -34,11 +35,16 @@ def impute_pca_method(
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     if n_pcs is None:
         n_pcs = mat.shape[1] - 1
-    with (robjects.default_converter + pandas2ri.converter).context():
-        res = pca_methods.pca(nan_to_na(mat), method=method, nPcs=n_pcs, verbose=False)
+    mat_np = mat.to_numpy()
+    mask = ~np.isnan(mat_np).all(axis=1)
+    with (robjects.default_converter + numpy2ri.converter).context():
+        #import pdb; pdb.set_trace()
+        res = pca_methods.pca(nan_to_na(mat_np[mask, :]), method=method, nPcs=n_pcs, verbose=False)
         res = pca_methods.completeObs(res)
-    assert res.shape == mat.shape
-    matrix_imputed = pd.DataFrame(res, columns=mat.columns, index=mat.index)
+    mat_np[mask, :] = res
+    mat_np[~mask, :] = np.nanmean(mat_np, axis=0)[np.newaxis, :]
+    assert mat_np.shape == mat.shape
+    matrix_imputed = pd.DataFrame(mat_np, columns=mat.columns, index=mat.index)
     if result_column is not None:
         dataset.set_samples_value_matrix(matrix=matrix_imputed, molecule=molecule, column=result_column)
     vals = matrix_imputed.stack().swaplevel()

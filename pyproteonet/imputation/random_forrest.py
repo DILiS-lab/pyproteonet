@@ -23,7 +23,7 @@ from .sklearn import generic_matrix_imputation
 #     return dataset
 
 def missing_forrest_impute(
-    dataset: Dataset, molecule: str, column: str, proteins_as_variables:bool = False, result_column: Optional[str] = None, **kwargs
+    dataset: Dataset, molecule: str, column: str, molecules_as_variables:bool = False, result_column: Optional[str] = None, **kwargs
 ) -> Dataset:
     imputer = MissForest(missing_values=dataset.missing_value, **kwargs)
     matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
@@ -31,10 +31,10 @@ def missing_forrest_impute(
     #mask = np.full(matrix.shape[0], True)#
 
     mat = matrix.loc[mask, :].to_numpy()
-    if proteins_as_variables:
+    if molecules_as_variables:
         mat = mat.T
     mat = imputer.fit_transform(mat)
-    if proteins_as_variables:
+    if molecules_as_variables:
         mat = mat.T
     assert mat.shape[0] == mask.sum()
     assert mat.shape[1] == matrix.shape[1]
