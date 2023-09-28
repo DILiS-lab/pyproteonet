@@ -17,7 +17,7 @@ def _dataset_to_alphapept_frame(
     partner_column: str = "abundance",
     skip_na: bool = True,
 ):
-    partner_molecule = dataset.get_mapping_partner(molecule=molecule, mapping=mapping)
+    molecule, mapping, partner_molecule = dataset.infer_mapping(molecule=molecule, mapping=mapping)
     df = pd.DataFrame({"quantity": dataset.get_column_flat(molecule=partner_molecule, column=partner_column)})
     # make conform with alphapept format so we can use alphapept's MaxLFQ implementation
     df.reset_index(inplace=True)
@@ -55,7 +55,7 @@ def max_lfq(
         partner_column=partner_column,
         skip_na=True,
     )
-    partner_molecule = dataset.get_mapping_partner(molecule=molecule, mapping=mapping)
+    molecule, mapping, partner_molecule = dataset.infer_mapping(molecule=molecule, mapping=mapping)
     if only_unique:
         uniques = dataset.molecule_set.get_mapping_unique_molecules(
             molecule=partner_molecule, partner_molecule=molecule, mapping=mapping

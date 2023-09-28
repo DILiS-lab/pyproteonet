@@ -26,13 +26,13 @@ def impute_miss_forest(
     molecule: str,
     column: str,
     result_column: Optional[str] = None,
-    proteins_as_variables:bool = True,
+    molecules_as_variables:bool = True,
     ntree=100,
     **kwds
 ):
     matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     mat = matrix.to_numpy()
-    if proteins_as_variables:
+    if molecules_as_variables:
         mat = mat.T
     mask = (np.isnan(mat).sum(axis=0) < mat.shape[0] - 1)#missForest requires at least two samples
     #Enable multithreading
@@ -47,7 +47,7 @@ def impute_miss_forest(
     with (robjects.default_converter + numpy2ri.converter).context():
         imp = miss_forest.missForest(mat[:, mask], parallelize='no', ntree=ntree, **kwds)['ximp']
     mat[:, mask] = imp
-    if proteins_as_variables:
+    if molecules_as_variables:
         mat = mat.T
     assert mat.shape == matrix.shape
 

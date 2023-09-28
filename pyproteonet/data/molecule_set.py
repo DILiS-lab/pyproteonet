@@ -279,7 +279,7 @@ class MoleculeSet:
         if only_unique:
             if molecule == partner_molecule:
                 raise AttributeError(
-                    "Only_unique not supported for mappings between only one molecule type are not supported!"
+                    "Only_unique not supported for mappings between only one molecule type!"
                 )
             mapped["partner_deg"] = 1
             partner_degs = mapped.groupby(partner_molecule)["partner_deg"].count()
