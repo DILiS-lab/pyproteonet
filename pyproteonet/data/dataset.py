@@ -283,7 +283,7 @@ class Dataset:
         res = []
         for sample, map in sample_maps.items():
             vals = map.copy()
-            vals[columns] = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(0), columns]
+            vals[columns] = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(0), columns].values
             if partner_columns:
                 partner_vals = (
                     self.samples_dict[sample]

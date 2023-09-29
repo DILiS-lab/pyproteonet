@@ -364,7 +364,7 @@ class MoleculeSet:
             lookup[molecules[0]] = lookup.get(molecules[0], []) + [mapping_name]
             self.mappings_lookup[molecules[1]] = lookup
 
-    def add_mapping_pairs(self, name: str, pairs: pd.DataFrame, mapping_molecules: Optional[Tuple[str, str]]):
+    def add_mapping_pairs(self, name: str, pairs: pd.DataFrame, mapping_molecules: Optional[Tuple[str, str]] = None):
         if name not in self.mappings:
             mapping = MoleculeMapping(name=name, df=pairs, mapping_molecules=mapping_molecules)
             mapping.validate_for_molecule_set(molecule_set=self)

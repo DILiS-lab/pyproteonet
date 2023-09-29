@@ -74,7 +74,7 @@ class ProteinPeptideDatasetMocker:
             flyability_alpha=self.flyability_dist[0],
             flyability_beta=self.flyability_dist[1],
             peptide_noise_sigma=self.peptide_noise_level,
-            peptide_poisson_error=False,
+            peptide_poisson_error=True,
             protein_column="abundance_gt",
             peptide_column="abundance",
             protein_molecule=self.protein_molecule,

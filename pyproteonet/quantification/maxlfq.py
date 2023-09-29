@@ -10,12 +10,13 @@ import numpy as np
 # import numpy.typing as npt  # not used yet
 import pandas as pd  # type: ignore
 from numba import njit, prange  # type: ignore
+from numba_progress import ProgressBar
 
 from ..data.dataset import Dataset
 
 
 @njit(nogil=True)
-def get_ratios(quantitative_data, sample_combinations):
+def get_ratios(quantitative_data, sample_combinations, min_ratios: int):
     num_samples = quantitative_data.shape[1]
 
     ratios = np.empty((num_samples, num_samples), dtype=np.float64)
@@ -29,9 +30,10 @@ def get_ratios(quantitative_data, sample_combinations):
         ratio = -quantitative_data[:, sample_a] + quantitative_data[:, sample_b]
 
         ratio_median = np.nanmedian(ratio)
+        if min_ratios > 1 and (~np.isnan(ratio)).sum() < min_ratios:
+            ratio_median = np.nan
 
         ratios[sample_b, sample_a] = ratio_median
-
     return ratios
 
 
@@ -50,14 +52,13 @@ def solve_profile(X, ratios, sample_combinations):
             i = sample_combination[0]
             j = sample_combination[1]
 
-            A[i][j] = -1.0
-            A[j][i] = -1.0
-            A[i][i] += 1.0
-            A[j][j] += 1.0
 
             ratio = ratios[j, i]
-
             if not np.isnan(ratio):
+                A[i][j] = -1.0
+                A[j][i] = -1.0
+                A[i][i] += 1.0
+                A[j][j] += 1.0
                 b[i] -= ratio
                 b[j] += ratio
 
@@ -88,7 +89,7 @@ def solve_profile(X, ratios, sample_combinations):
 
 @njit(nogil=True)
 def build_connection_graph(grouping):
-    connected_sample_groups = numba.typed.Dict()
+    connected_sample_groups = numba.typed.List()
 
     connected_indices = numba.typed.List()
 
@@ -107,15 +108,50 @@ def build_connection_graph(grouping):
                     connected_indices.append(compared_sample_idx)
 
             if len(sample_group) > 0:
-                connected_sample_groups[sample_group_id] = np.array(sample_group)
+                connected_sample_groups.append(np.array(sample_group))
 
                 sample_group_id += 1
 
             else:
-                connected_sample_groups[sample_group_id] = np.array([sample_idx])
+                connected_sample_groups.append(np.array([sample_idx]))
 
                 sample_group_id += 1
 
+    return connected_sample_groups
+
+
+@njit(nogil=True)
+def build_connection_graph_new(grouping, min_ratios: int):
+    connected_sample_groups = numba.typed.List()
+    num_samples = grouping.shape[1]
+
+    adj = numba.typed.List([numba.typed.List.empty_list(numba.int64) for x in range(num_samples)])
+    for sample_idx in range(num_samples):
+        for compared_sample_idx in range(num_samples):
+            if sample_idx == compared_sample_idx:
+                continue
+            ratio = -grouping[:, sample_idx] + grouping[:, compared_sample_idx]
+            if (~np.isnan(ratio)).sum() >= min_ratios:
+                adj[sample_idx].append(compared_sample_idx)
+    visited = np.full(num_samples, False)
+    i = 0
+    for sample_id in range(num_samples):
+        #connected_sample_groups.append(np.asarray([1,2,3]))
+        if visited[sample_id]:
+            continue
+        sample_group = numba.typed.List.empty_list(numba.int64)
+        q = numba.typed.List.empty_list(numba.int64)
+        q.append(sample_id)
+        visited[sample_id] = True
+        while len(q):
+            i+=1
+            current = q.pop()
+            sample_group.append(current)
+            for neighbor in adj[current]:
+                if not visited[neighbor]:
+                    q.append(neighbor)
+                    visited[neighbor] = True
+        connected_sample_groups.append(np.asarray(sample_group))
     return connected_sample_groups
 
 
@@ -146,14 +182,14 @@ def mask_group(grouping):
 
 
 @njit(nogil=True)
-def quantify_group(grouping, connected_graph):
+def quantify_group(grouping, connected_graph, min_ratios: int, median_fallback: bool):
     profile = np.zeros((grouping.shape[1]))
 
-    for sample_group_id, graph in connected_graph.items():
+    for graph in connected_graph:
         if graph.shape[0] == 1:
             subset = grouping[:, graph]
 
-            if np.isnan(subset).all():
+            if np.isnan(subset).all() or not median_fallback:
                 profile[graph] = np.nan
 
             else:
@@ -164,7 +200,7 @@ def quantify_group(grouping, connected_graph):
 
             sample_combinations = build_combinations(subset)
 
-            ratios = get_ratios(subset, sample_combinations)
+            ratios = get_ratios(subset, sample_combinations, min_ratios=min_ratios)
 
             solved_profile = solve_profile(subset, ratios, sample_combinations)
 
@@ -175,7 +211,7 @@ def quantify_group(grouping, connected_graph):
 
 
 @njit(parallel=True)
-def quantify_groups(groupings, minimum_subgroups):
+def quantify_groups(groupings, minimum_subgroups, min_ratios: int, median_fallback: bool, pbar: Optional[ProgressBar] = None):
     num_groups = len(groupings)
 
     results = np.empty(shape=(num_groups, groupings[0].shape[1]))
@@ -184,9 +220,10 @@ def quantify_groups(groupings, minimum_subgroups):
         grouping = mask_group(groupings[group_idx])
 
         if grouping.shape[0] >= minimum_subgroups:
-            connected_graph = build_connection_graph(grouping)
+            connected_graph = build_connection_graph_new(grouping=grouping, min_ratios=min_ratios)
+            #connected_graph = build_connection_graph(grouping)
 
-            profile = quantify_group(grouping, connected_graph)
+            profile = quantify_group(grouping, connected_graph, min_ratios=min_ratios, median_fallback=median_fallback)
 
         else:
             profile = np.zeros((grouping.shape[1]))
@@ -194,11 +231,13 @@ def quantify_groups(groupings, minimum_subgroups):
 
         for sample_idx in range(profile.shape[0]):
             results[group_idx, sample_idx] = profile[sample_idx]
-
+        if pbar is not None:
+            pbar.update(1)
     return results
 
 
-def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, is_log: bool = False, result_column: Optional[str] = None):
+def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, min_subgroups: int = 1, min_ratios: int = 1, median_fallback: bool = True,
+           is_log: bool = False, result_column: Optional[str] = None, pbar: bool = False):
     mapped = dataset.molecule_set.get_mapped(molecule=molecule, mapping=mapping)
     molecule, mapping, partner = dataset.infer_mapping(molecule=molecule, mapping=mapping)
     degs = dataset.molecule_set.get_mapping_degrees(molecule=partner, mapping=mapping)
@@ -215,7 +254,13 @@ def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, i
         groupings.append(group)
         group_ids.append(key)
     res_mat = pd.DataFrame(np.nan, index=dataset.molecules[molecule].index, columns=mat.columns)
-    res = quantify_groups(groupings=groupings, minimum_subgroups=1)
+    progress_bar = None
+    if pbar:
+        progress_bar = ProgressBar(total=len(groupings))
+    res = quantify_groups(groupings=groupings, minimum_subgroups=min_subgroups, min_ratios=min_ratios, median_fallback=median_fallback,
+                          pbar=progress_bar)
+    if pbar:
+        progress_bar.close()
     if not is_log:
         res = math.e ** res
     res_mat.loc[group_ids, :] = res
