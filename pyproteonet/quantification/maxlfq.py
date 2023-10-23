@@ -136,7 +136,6 @@ def build_connection_graph_new(grouping, min_ratios: int):
     visited = np.full(num_samples, False)
     i = 0
     for sample_id in range(num_samples):
-        #connected_sample_groups.append(np.asarray([1,2,3]))
         if visited[sample_id]:
             continue
         sample_group = numba.typed.List.empty_list(numba.int64)

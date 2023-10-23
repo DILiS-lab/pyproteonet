@@ -31,6 +31,7 @@ def impute_pca_method(
     method: Literal['svdPca', 'ppca', 'bpca', 'svdImpute'] = "bpca",
     n_pcs: Optional[int] = None,
     result_column: Optional[str] = None,
+    molecules_as_variables: bool = False,
 ):
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     if n_pcs is None:
@@ -39,8 +40,14 @@ def impute_pca_method(
     mask = ~np.isnan(mat_np).all(axis=1)
     with (robjects.default_converter + numpy2ri.converter).context():
         #import pdb; pdb.set_trace()
-        res = pca_methods.pca(nan_to_na(mat_np[mask, :]), method=method, nPcs=n_pcs, verbose=False)
+        if molecules_as_variables:
+            in_ = nan_to_na(mat_np[mask, :].T)
+        else:
+            in_ = nan_to_na(mat_np[mask, :])
+        res = pca_methods.pca(in_, method=method, nPcs=n_pcs, verbose=False)
         res = pca_methods.completeObs(res)
+        if molecules_as_variables:
+            res = res.T
     mat_np[mask, :] = res
     mat_np[~mask, :] = np.nanmean(mat_np, axis=0)[np.newaxis, :]
     assert mat_np.shape == mat.shape

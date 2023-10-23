@@ -185,7 +185,9 @@ class GnnPredictor:
                     else:
                         sample.values[mol].loc[:, result_column] = sample.dataset.missing_value
                     molecules = graph.nodes.loc[mask_nodes.nonzero(), "molecule_id"].values  # type: ignore
-                    prediction = prediction.detach().numpy()
+                    prediction = prediction.detach().squeeze().numpy()
+                    if len(prediction.shape) == 1:
+                        prediction = prediction[:, np.newaxis]
                     for i, c in enumerate(result_column):
                         #print(sample.name, prediction.mean())
                         sample.values[mol].loc[molecules, c] = prediction[:, i]

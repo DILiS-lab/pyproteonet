@@ -18,14 +18,16 @@ def gnn_impute(
     column: str,
     mapping: str,
     result_column: str = "gnnimp",
-    partner_molecule: Optional[str] = None,
+    partner_molecule: Optional[str] = None, #Deprecated, use mapping instead
     partner_column: Optional[str] = None,
     molecule_columns: List[str] = [],
+    feature_columns: List[str] = [],
     train_frac: float = 0.1,
     also_train_on_partner: bool = True,
     validation_frac: float = 0.2,
     validation_ids: Optional[pd.Index] = None,
     module: Optional[pl.LightningModule] = None,
+    is_log: bool = False,
     model: Callable = GAT(in_dim=3, hidden_dim=40, out_dim=1, num_heads=20),
     missing_substitute_value: float = 0.0,
     early_stopping: bool = True,
@@ -44,18 +46,22 @@ def gnn_impute(
     if not inplace:
         dataset = dataset.copy()
 
-    gnnds = dataset.copy(columns=[])
-    vals = np.log(dataset.values[molecule][column])
+    gnnds = dataset.copy(columns=feature_columns)
+    vals = dataset.values[molecule][column]
+    if not is_log:
+        vals = np.log(vals)
     mean = vals.mean()
     std = vals.std()
     gnnds.values[molecule]["gnninput"] = (vals - mean) / std
-    if partner_molecule is not None:
-        if partner_column is None:
-            partner_column = column
-        vals = np.log(dataset.values[partner_molecule][partner_column])
-        partner_mean = vals.mean()
-        partner_std = vals.std()
-        gnnds.values[partner_molecule]["gnninput"] = (vals - partner_mean) / partner_std
+    molecule, mapping, partner_molecule = dataset.infer_mapping(molecule=molecule, mapping=mapping)
+    if partner_column is None:
+        partner_column = column
+    vals = dataset.values[partner_molecule][partner_column]
+    if not is_log:
+        vals = np.log(vals)
+    partner_mean = vals.mean()
+    partner_std = vals.std()
+    gnnds.values[partner_molecule]["gnninput"] = (vals - partner_mean) / partner_std
 
     if also_train_on_partner:
         train_molecules = [molecule, partner_molecule]
@@ -84,7 +90,7 @@ def gnn_impute(
         logger = ConsoleLogger()
     gnn_predictor = GnnPredictor(
         mapping=mapping,
-        value_columns=["gnninput"],
+        value_columns=["gnninput"] + feature_columns,
         molecule_columns=molecule_columns,
         target_column="gnninput",
         module=module,
@@ -118,7 +124,13 @@ def gnn_impute(
     for i, c in enumerate(result_column):
         vals = gnnds.values[molecule][f"res{i}"]
         if i == 0:
-            dataset.values[molecule][c] = np.exp((vals * std) + mean)
+            vals = (vals * std) + mean
+            if not is_log:
+                vals = np.exp(vals)
+            dataset.values[molecule][c] = vals
         else:
-            dataset.values[molecule][c] = np.exp(vals * std)
+            vals = vals * std
+            if not is_log:
+                vals = np.exp(vals)
+            dataset.values[molecule][c] = vals
     return dataset

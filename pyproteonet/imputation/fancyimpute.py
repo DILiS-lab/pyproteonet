@@ -1,4 +1,5 @@
-from typing import Optional, Callable
+from typing import Optional, Union
+import math
 
 import numpy as np
 import pandas as pd
@@ -32,13 +33,25 @@ def generic_fancy_impute(
     vals.index.set_names(["sample", "id"], inplace=True)
     return vals
 
+
 def iterative_svd_impute(
-    dataset: Dataset, molecule: str, column: str, result_column: Optional[str] = None, inplace: bool = False, min_value: Optional[float]=None, **kwargs
+    dataset: Dataset,
+    molecule: str,
+    column: str,
+    result_column: Optional[str] = None,
+    inplace: bool = False,
+    min_value: Optional[float] = None,
+    rank: Union[float, int] = 0.2,
+    **kwargs
 ) -> Dataset:
     if min_value is None:
         min_value = dataset.values[molecule][column].min()
-    imputer = IterativeSVD(min_value=min_value, **kwargs)
-    dataset = generic_fancy_impute(
+    if rank == -1:
+        rank = len(dataset.sample_names) - 1
+    if 0 < rank < 1.0:
+        rank = min(math.ceil(len(dataset.sample_names) * 0.2), len(dataset.sample_names) - 1)
+    imputer = IterativeSVD(min_value=min_value, rank=rank, **kwargs)
+    res = generic_fancy_impute(
         dataset=dataset, molecule=molecule, column=column, imputer=imputer, result_column=result_column, inplace=inplace
     )
-    return dataset
+    return res

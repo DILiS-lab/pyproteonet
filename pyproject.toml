@@ -23,7 +23,9 @@ dependencies = [
     "pyopenms",
     "alphapept",
     "rpy2==3.5.14",
-    "fancyimpute"
+    "fancyimpute",
+    "numba",
+    "numba-progress"
 ]
 [dev-dependencies]
 test = [

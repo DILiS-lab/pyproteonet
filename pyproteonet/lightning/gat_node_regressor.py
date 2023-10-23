@@ -12,20 +12,22 @@ from dgl.dataloading import GraphDataLoader
 from ..data.abstract_masked_dataset import AbstractMaskedDataset
 from ..dgl.masked_dataset_adapter import MaskedDatasetAdapter
 from ..dgl.graph_key_dataset import GraphKeyDataset
-from ..dgl.gnn_architectures.gat import GAT
+from .abstract_node_regressor import AbstractNodeRegressor
+from ..dgl.gnn_architectures.deep_gat import DeepGAT
 
 
-class GatNodeRegressor(pl.LightningModule):
+class GatNodeRegressor(AbstractNodeRegressor):
     def __init__(
         self,
         in_dim: int = 3,
-        hidden_dim: int = 40,
-        num_heads: int = 20,
-        loss: Literal["mse", "nll"] = "mse",
+        heads: int = [20,20],
+        gat_dims: int = [40, 20],
+        loss: Literal["mse", "gnll"] = "mse",
         nan_substitute_value: float = 0.0,
         mask_substitute_value: float = 0.0,
         hide_substitute_value: float = 0.0,
         lr: float = 0.0001,
+        use_gatv2: bool = False,
     ):
         super().__init__(
                 nan_substitute_value=nan_substitute_value,
@@ -37,12 +39,12 @@ class GatNodeRegressor(pl.LightningModule):
         self.loss = loss.lower()
         if self.loss == "mse":
             self.loss_fn = torch.nn.MSELoss()
-        elif self.loss == "nll":
+        elif self.loss == "gnll":
             self.loss_fn = lambda y, target: F.gaussian_nll_loss(y[:, :, 0], target, torch.abs(y[:, :, 1]), eps=1e-4)
             self._out_dim = 2
         else:
             raise AttributeError("Loss has to be 'mse', or 'nll'!")
-        self._model = GAT(in_dim=in_dim, hidden_dim=hidden_dim, out_dim=self.out_dim, num_heads=num_heads)
+        self._model = DeepGAT(in_dim=in_dim, heads=heads, gat_dims=gat_dims, out_dim=self.out_dim, use_gatv2=use_gatv2)
 
     @property
     def model(self):
