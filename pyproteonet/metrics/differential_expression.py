@@ -1,4 +1,5 @@
 from typing import Union, List
+import math
 
 import numpy as np
 import pandas as pd
@@ -7,7 +8,7 @@ from statsmodels.stats.multitest import multipletests
 
 from ..data.dataset import Dataset
 
-def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]], group1_samples: List[str], group2_samples: List[str]):
+def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]], group1_samples: List[str], group2_samples: List[str], is_log: bool = True):
     if isinstance(columns, str):
         columns = [columns]
     des = pd.DataFrame(index=dataset.molecules[molecule].index)
@@ -15,6 +16,8 @@ def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]], gro
     fcs = pd.DataFrame(index=dataset.molecules[molecule].index)
     for c in columns:
         mat = dataset.get_samples_value_matrix(molecule='protein_group', column=c)
+        if is_log:
+            mat = math.e**mat
         log_mat = np.log(mat)
         test_res = ttest_ind(log_mat[group1_samples].to_numpy(), log_mat[group2_samples].to_numpy(), axis=1, nan_policy='omit')
         pvalues = pd.Series(test_res.pvalue.data, index=mat.index)

@@ -99,7 +99,7 @@ class ProteinPeptideDatasetMocker:
                 inplace=True,
                 mask_column='is_mnar'
             )
-            pep_abs = sim_ds.values[self.peptide_molecule]["abundance"]
+            pep_abs = sim_ds.values[self.peptide_molecule]["abundance_missing"]
             mnar_missingness = pep_abs.isna().sum() / pep_abs.shape[0]
             if print_parameters:
                 print(f"MNAR missingness: {mnar_missingness}")

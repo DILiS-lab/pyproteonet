@@ -236,12 +236,15 @@ def quantify_groups(groupings, minimum_subgroups, min_ratios: int, median_fallba
 
 
 def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, min_subgroups: int = 1, min_ratios: int = 1, median_fallback: bool = True,
-           is_log: bool = False, result_column: Optional[str] = None, pbar: bool = False):
+           is_log: bool = False, only_unique: bool = True, result_column: Optional[str] = None, pbar: bool = False):
     mapped = dataset.molecule_set.get_mapped(molecule=molecule, mapping=mapping)
     molecule, mapping, partner = dataset.infer_mapping(molecule=molecule, mapping=mapping)
     degs = dataset.molecule_set.get_mapping_degrees(molecule=partner, mapping=mapping)
-    unique_partners = degs[degs==1].index
-    mapped = mapped[mapped.index.get_level_values(partner).isin(unique_partners)]
+    if only_unique:
+        considered_partners = degs[degs==1].index
+    else:
+        considered_partners = degs.index
+    mapped = mapped[mapped.index.get_level_values(partner).isin(considered_partners)]
     mat = dataset.get_samples_value_matrix(molecule=partner, column=partner_column)
     if not is_log:
         mat = np.log(mat)

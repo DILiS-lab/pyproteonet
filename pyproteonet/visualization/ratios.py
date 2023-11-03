@@ -20,9 +20,10 @@ def plot_ratio_scatter(
     axs_columns: int = 4,
     axs: Optional[List[plt.Axes]] = None,
     ids: Optional[pd.Index] = None,
-    logarithmize: bool = True,
+    is_log: bool = True,
     plot_density: bool = False,
     s: float = 10,
+    alpha: Optional[float] = None
 ):
     markers = ["o", "x", "D", "^", "v"]
     if categories is None:
@@ -39,14 +40,15 @@ def plot_ratio_scatter(
         vals = dataset.values[molecule][col].unstack(level="sample")
         if ids is not None:
             vals = vals.loc[ids]
+        if is_log:
+            vals = math.e**vals
         vals_high = vals[high_samples]
         vals_low = vals[low_samples]
         vals_high = vals_high.median(axis=1)
         vals_low = vals_low.median(axis=1)
         ratio = np.log2(vals_high / vals_low)
         abundance = (vals_high + vals_low) / 2
-        if logarithmize:
-            abundance = np.log(abundance)
+        abundance = np.log(abundance)
         non_na_mask = ~ratio.isna()
         for i, category in enumerate(unique_categories):
             if categories is not None:
@@ -58,12 +60,11 @@ def plot_ratio_scatter(
             if plot_density:
                 xy = np.vstack([ratio_plot, log_abundance_plot])
                 z = gaussian_kde(xy)(xy)
-                ax.scatter(ratio_plot, log_abundance_plot, s=s, c=z, label=f"{category}", marker=markers[i])
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, c=z, label=f"{category}", marker=markers[i], alpha=alpha)
             else:
-                ax.scatter(ratio_plot, log_abundance_plot, s=s, label=f"{category}")
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, label=f"{category}", alpha=alpha)
             ax.set_xlabel("$Log_2$(ratio)")
-            if logarithmize:
-                ax.set_ylabel("$Log_e$(abundance)")
+            ax.set_ylabel("$Log_e$(abundance)")
         ax.legend()
         ax.set_title(col)
     return ratio_plot, log_abundance_plot
