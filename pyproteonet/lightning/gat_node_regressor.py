@@ -22,6 +22,7 @@ class GatNodeRegressor(AbstractNodeRegressor):
         in_dim: int = 3,
         heads: int = [20,20],
         gat_dims: int = [40, 20],
+        out_dim: int = 1,
         loss: Literal["mse", "gnll"] = "mse",
         nan_substitute_value: float = 0.0,
         mask_substitute_value: float = 0.0,
@@ -35,13 +36,13 @@ class GatNodeRegressor(AbstractNodeRegressor):
                 hide_substitute_value=hide_substitute_value,
                 lr=lr,
             )
-        self._out_dim = 1
+        self._out_dim = out_dim
         self.loss = loss.lower()
         if self.loss == "mse":
             self.loss_fn = torch.nn.MSELoss()
         elif self.loss == "gnll":
             self.loss_fn = lambda y, target: F.gaussian_nll_loss(y[:, :, 0], target, torch.abs(y[:, :, 1]), eps=1e-4)
-            self._out_dim = 2
+            self._out_dim = 2 * out_dim
         else:
             raise AttributeError("Loss has to be 'mse', or 'nll'!")
         self._model = DeepGAT(in_dim=in_dim, heads=heads, gat_dims=gat_dims, out_dim=self.out_dim, use_gatv2=use_gatv2)

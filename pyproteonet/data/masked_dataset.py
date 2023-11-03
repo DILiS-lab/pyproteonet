@@ -2,13 +2,14 @@ from typing import Dict, Optional, List, Iterable, Union
 
 import pandas as pd
 import numpy as np
+import torch
+import dgl
 
 from .dataset import Dataset
 from .dataset_sample import DatasetSample
 from .molecule_graph import MoleculeGraph
 from .abstract_masked_dataset import AbstractMaskedDataset
 from ..dgl.graph_key_dataset import GraphKeyDataset
-
 
 class MaskedDataset(AbstractMaskedDataset):
     def __init__(
@@ -20,8 +21,9 @@ class MaskedDataset(AbstractMaskedDataset):
         self.dataset = dataset
         self._keys = set.union(*[set(m.keys()) for m in masks.values()])
         self.masks = masks
-        self.hidden = hidden
-        if self.hidden is not None:
+        self.hidden = dict()
+        if hidden is not None:
+            self.hidden = hidden
             self._keys = set.union(self._keys, *[set(m.keys()) for m in hidden.values()])
         self._keys = list(self._keys)
 
@@ -44,7 +46,7 @@ class MaskedDataset(AbstractMaskedDataset):
 
     @property
     def has_hidden(self) -> bool:
-        if self.hidden is not None:
+        if len(self.hidden):
             return True
         return False
 
@@ -88,6 +90,35 @@ class MaskedDataset(AbstractMaskedDataset):
             missing_column_value=missing_column_value,
         )
 
+    def to_dgl_graph(self, molecule_features: Dict[str, Dict[str,str]], mappings: List[str], bidirectional: bool=True):
+        graph_data = dict()
+        for mapping_name in mappings:
+            mapping = self.dataset.mappings[mapping_name]
+            identifier = (mapping.mapping_molecules[0], mapping_name, mapping.mapping_molecules[1])
+            edges = []
+            for i, mol in enumerate(mapping.mapping_molecules):
+                e_data = self.dataset.molecules[mol].index.get_indexer(mapping.df.index.get_level_values(i))
+                edges.append(torch.from_numpy(e_data))
+            edges = tuple(edges)
+            graph_data[identifier] = edges
+        g = dgl.heterograph(graph_data)
+        num_samples = len(self.dataset.sample_names)
+        for mol, mol_features in molecule_features.items():
+            mol_ids = self.dataset.molecules[mol].index
+            for feature, column in mol_features.items():
+                if feature in {'hidden', 'mask'}:
+                    raise KeyError('Feature names "hidden" and "mask" are reserved names')
+                mat = self.dataset.get_samples_value_matrix(molecule=mol, column=column).loc[mol_ids]
+                g.nodes[mol].data[feature] = torch.from_numpy(mat.to_numpy())
+            if mol in self.masks:
+                g.nodes[mol].data['mask'] = torch.from_numpy(self.masks[mol].loc[mol_ids].to_numpy())
+            else:
+                g.nodes[mol].data['mask'] = torch.full((mol_ids.shape[0], num_samples), False)
+            if mol in self.hidden:
+                g.nodes[mol].data['hidden'] = torch.from_numpy(self.hidden[mol].loc[mol_ids].to_numpy())
+            else:
+                g.nodes[mol].data['hidden'] = torch.full((mol_ids.shape[0], num_samples), False)
+        return g
 
 def _ids_to_mask(dataset: Dataset, molecule: str, ids: pd.Index):
     mask = pd.DataFrame(index=dataset.molecules[molecule].index, data={sample: False for sample in dataset.sample_names})
