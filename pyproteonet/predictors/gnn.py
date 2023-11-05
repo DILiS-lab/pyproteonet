@@ -24,7 +24,7 @@ class GnnPredictor:
     def __init__(
         self,
         mapping: str = "gene",
-        value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
+        value_columns: Union[Dict[str, List[str]], List[str]] = [],
         molecule_columns: List[str] = [],
         target_column: str = "abundance",
         module: Optional[pl.LightningModule] = None,

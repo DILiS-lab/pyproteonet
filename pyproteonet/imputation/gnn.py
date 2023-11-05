@@ -6,7 +6,7 @@ import lightning.pytorch as pl
 
 from ..data.dataset import Dataset
 from ..predictors.gnn import GnnPredictor
-from ..processing.masking import train_test_non_missing_no_overlap_iterable, mask_missing, non_missing_iterable
+from ..masking.masking import train_test_non_missing_no_overlap_iterable, mask_missing, non_missing_iterable
 from ..dgl.gnn_architectures.gat import GAT
 from ..lightning.console_logger import ConsoleLogger
 from ..data.masked_dataset import MaskedDataset
@@ -18,7 +18,7 @@ def gnn_impute(
     column: str,
     mapping: str,
     result_column: str = "gnnimp",
-    partner_molecule: Optional[str] = None, #Deprecated, use mapping instead
+    partner_molecule: Optional[str] = None,  # Deprecated, use mapping instead
     partner_column: Optional[str] = None,
     molecule_columns: List[str] = [],
     feature_columns: List[str] = [],
@@ -90,7 +90,7 @@ def gnn_impute(
         logger = ConsoleLogger()
     gnn_predictor = GnnPredictor(
         mapping=mapping,
-        value_columns=["gnninput"] + feature_columns,
+        value_columns=feature_columns,
         molecule_columns=molecule_columns,
         target_column="gnninput",
         module=module,
@@ -117,7 +117,7 @@ def gnn_impute(
             predict_ids = predict_ids[
                 predict_ids.isna() | predict_ids.index.get_level_values("id").isin(validation_ids)
             ]
-        predict_mds = MaskedDataset.from_ids(dataset=gnnds, mask_ids={molecule:predict_ids.index})
+        predict_mds = MaskedDataset.from_ids(dataset=gnnds, mask_ids={molecule: predict_ids.index})
     gnn_predictor.predict(
         mds=predict_mds, result_column=[f"res{i}" for i, c in enumerate(result_column)], silent=silent
     )

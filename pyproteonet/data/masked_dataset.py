@@ -90,7 +90,7 @@ class MaskedDataset(AbstractMaskedDataset):
             missing_column_value=missing_column_value,
         )
 
-    def to_dgl_graph(self, molecule_features: Dict[str, Dict[str,str]], mappings: List[str], bidirectional: bool=True):
+    def to_dgl_graph(self, molecule_features: Dict[str, List[str]], mappings: List[str], bidirectional: bool=True):
         graph_data = dict()
         for mapping_name in mappings:
             mapping = self.dataset.mappings[mapping_name]
@@ -105,10 +105,10 @@ class MaskedDataset(AbstractMaskedDataset):
         num_samples = len(self.dataset.sample_names)
         for mol, mol_features in molecule_features.items():
             mol_ids = self.dataset.molecules[mol].index
-            for feature, column in mol_features.items():
+            for feature in mol_features:
                 if feature in {'hidden', 'mask'}:
                     raise KeyError('Feature names "hidden" and "mask" are reserved names')
-                mat = self.dataset.get_samples_value_matrix(molecule=mol, column=column).loc[mol_ids]
+                mat = self.dataset.get_samples_value_matrix(molecule=mol, column=feature).loc[mol_ids]
                 g.nodes[mol].data[feature] = torch.from_numpy(mat.to_numpy())
             if mol in self.masks:
                 g.nodes[mol].data['mask'] = torch.from_numpy(self.masks[mol].loc[mol_ids].to_numpy())

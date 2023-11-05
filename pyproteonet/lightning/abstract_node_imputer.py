@@ -16,27 +16,24 @@ from ..dgl.graph_key_dataset import GraphKeyDataset
 from ..dgl.gnn_architectures.gat import GAT
 
 
-class AbstractNodeRegressor(pl.LightningModule):
+class AbstractNodeImputer(pl.LightningModule):
     def __init__(
         self,
         nan_substitute_value: float = 0.0,
         mask_substitute_value: float = 0.0,
         hide_substitute_value: float = 0.0,
         lr: float = 0.0001,
-        num_abundance_features: int = 1
     ):
         super().__init__()
         self.nan_substitute_value = nan_substitute_value
         self.mask_substitute_value = mask_substitute_value
         self.hide_substitute_value = hide_substitute_value
         self.lr = lr
-        self.num_abundance_features = num_abundance_features
         self.save_hyperparameters(
             "nan_substitute_value",
             "mask_substitute_value",
             "hide_substitute_value",
             "lr",
-            "num_abundance_features",
         )
 
     @property
@@ -53,23 +50,22 @@ class AbstractNodeRegressor(pl.LightningModule):
         return 1
 
     def forward(self, graph):
-        features = graph.ndata["x"].float()
+        target = graph.ndata["target"].float().clone()
+        features = graph.ndata["features"].float()
         mask_nodes = graph.ndata["mask"]
-        features = features.clone()
         if "hide" in graph.ndata:
             to_hide = graph.ndata["hide"]
-            if len(to_hide.shape) == 1:
-                to_hide = torch.unsqueeze(to_hide, dim=-1)
-            for i in range(self.num_abundance_features):
-                features[to_hide[:,i], i] = self.hide_substitute_value
-        if len(mask_nodes.shape) == 1:
-            mask_nodes = torch.unsqueeze(mask_nodes, dim=-1)
-        for i in range(self.num_abundance_features):
-            features[mask_nodes[:,i], i] = self.hide_substitute_value
-        features[features.isnan()] = self.nan_substitute_value
-        features_dict = {"molecule": features}
+            #if len(to_hide.shape) == 1:
+            #    to_hide = torch.unsqueeze(to_hide, dim=-1)
+            target[to_hide] = self.hide_substitute_value
+        #if len(mask_nodes.shape) == 1:
+        #    mask_nodes = torch.unsqueeze(mask_nodes, dim=-1)
+        target[mask_nodes] = self.mask_substitute_value
+        target[target.isnan()] = self.nan_substitute_value
+        assert features.isnan().sum() == 0
+        #features_dict = {"molecule": torch.concat([target, features], axis=-1)}
         # Forward
-        pred = self.model(graph, feat=features_dict)
+        pred = self.model(graph, feat=torch.concat([target, features], axis=-1))
         return pred
 
     def _log_metrics(self, y: torch.tensor, target: torch.tensor, loss: torch.tensor, prefix: str):
@@ -79,8 +75,10 @@ class AbstractNodeRegressor(pl.LightningModule):
         mae = F.l1_loss(y, target).item()
         mse = F.mse_loss(y, target).item()
         #pearson = (torch.corrcoef(torch.t(torch.cat((y, target), -1)))[0, 1]).item()
-        #self.log(f"{prefix}_pearson", pearson, batch_size=batch_size)
-        #self.log(f"{prefix}_r2", pearson**2, batch_size=batch_size)
+        y, target = y.squeeze(), target.squeeze() #TODO look why this is necessary when training on singe samples
+        pearson = (torch.corrcoef(torch.t(torch.stack((y, target), -1)))[0, 1]).item()
+        self.log(f"{prefix}_pearson", pearson, batch_size=batch_size)
+        self.log(f"{prefix}_r2", pearson**2, batch_size=batch_size)
         self.log(f"{prefix}_loss", loss, batch_size=batch_size)
         self.log(f"{prefix}_mse", mse, batch_size=batch_size)
         self.log(f"{prefix}_rmse", mse**0.5, batch_size=batch_size)

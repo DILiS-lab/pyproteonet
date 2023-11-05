@@ -31,10 +31,13 @@ class DatasetSample:
     # def create_graph_nodes_edges(self):
     #     return self.molecule_set.create_graph_nodes_edges()
 
-    def copy(self, columns: Optional[Iterable[str]] = None, molecule_ids: Dict[str, pd.Index] = {}):
+    def copy(self, columns: Optional[Union[Iterable[str],Dict[str, Iterable[str]]]] = None, molecule_ids: Dict[str, pd.Index] = {}):
         new_values = {}
         for molecule, df in self.values.items():
-            cs = columns
+            if isinstance(columns, dict):
+                cs = columns.get(molecule, [])
+            else:
+                cs = columns
             if cs is None:
                 cs = df.keys()
             else:
@@ -128,7 +131,7 @@ class DatasetSample:
             graph=self.molecule_set.create_graph(mapping=mapping, bidirectional=True),
             dgl_graph=dgl_graph,
             dataset_sample=self,
-            value_columns=value_columns,
+            feature_columns=value_columns,
             molecule_columns=molecule_columns,
             target_column=target_column,
             missing_column_value=missing_column_value

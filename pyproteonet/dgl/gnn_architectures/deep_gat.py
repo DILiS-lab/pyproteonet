@@ -36,13 +36,13 @@ class DeepGAT(ResettableModule):
 		return h
 
 	def forward(self, graph, feat, eweight = None):
-		graph = dgl.to_homogeneous(graph, ndata = ['x'])
-		feat = feat['molecule']
+		#graph = dgl.to_homogeneous(graph, ndata = ['x'])
+		#feat = feat['molecule']
 		for layer in self.gat_layers:
 			feat = layer(graph, feat)
 			feat = self.reshape_multihead_output(F.relu(feat))
 		feat = self.out_layer(graph, feat)
-		feat = torch.squeeze(feat, dim = 2)
+		feat = torch.squeeze(feat, dim = 1)
 		return feat
 
 	def reset_parameters(self):

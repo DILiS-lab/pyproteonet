@@ -1,8 +1,8 @@
-from .abstract_node_regressor import AbstractNodeRegressor
+from .abstract_node_imputer import AbstractNodeImputer
 
 import torch.nn.functional as F
 
-class NodeRegressionModule(AbstractNodeRegressor):
+class NodeRegressionModule(AbstractNodeImputer):
     def __init__(
         self,
         model,

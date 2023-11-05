@@ -43,24 +43,24 @@ def populate_graph_dgl(
     graph: "MoleculeGraph",
     dgl_graph: dgl.DGLGraph,
     dataset_sample: "DatasetSample",
-    value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
+    feature_columns: Union[Dict[str, List[str]], List[str]] = [],
     molecule_columns: List[str] = [],
     target_column: str = "abundance",
     missing_column_value: Optional[float] = None,
 ):
-    if not (isinstance(value_columns, list) or isinstance(value_columns, dict)):
+    if not (isinstance(feature_columns, list) or isinstance(feature_columns, dict)):
         raise ValueError(
             "value_columns must either be list of strings representing the colums present "
             + "for any molecule to use as graph features or a dict mapping from molecule type name"
             + "to list of stings representing the value columns to use for every molecule type."
         )
-    if isinstance(value_columns, list):
+    if isinstance(feature_columns, list):
         node_type_groups = [(node_type, df) for node_type, df in graph.nodes.groupby("type")]
-        value_columns = {graph.inverse_type_mapping[node_type]: value_columns for node_type, _ in node_type_groups}  # type: ignore
+        feature_columns = {graph.inverse_type_mapping[node_type]: feature_columns for node_type, _ in node_type_groups}  # type: ignore
     all_value_columns = []
-    for vcs in value_columns.values():
+    for vcs in feature_columns.values():
         all_value_columns.extend(vcs)
-    num_value_columns = max([len(columns) for _, columns in value_columns.items()])
+    num_value_columns = max([len(columns) for _, columns in feature_columns.items()])
     node_molecule_values = dataset_sample.molecule_set.get_node_values_for_graph(graph=graph, include_id_and_type=False)
     num_nodes = dgl_graph.num_nodes("molecule")
     num_columns = num_value_columns + len(molecule_columns)
@@ -68,10 +68,11 @@ def populate_graph_dgl(
     target = np.full((num_nodes, 1), dataset_sample.missing_value, dtype=np.float32)
     if target_column not in all_value_columns:
         target_not_in_values = True
-        value_columns = {mol:cols + [target_column] for mol,cols in value_columns.items()}
+        #value_columns = {mol:cols + [target_column] for mol,cols in value_columns.items()}
     else:
+        raise ValueError("The target column should not be part of the feature columns")
         target_not_in_values = False
-    for molecule, columns in value_columns.items():
+    for molecule, columns in feature_columns.items():
         nodes = graph.node_mapping[molecule].loc[dataset_sample.values[molecule].index, "node_id"]
         for i, column in enumerate(columns):
             values = dataset_sample.values[molecule]
@@ -91,11 +92,12 @@ def populate_graph_dgl(
                             + " please set the missing_column_value arguement."
                         )
                     )
-            if column == target_column:
-                target[nodes, 0] = values
-                if target_not_in_values:
-                    continue
+            # if column == target_column:
+            #     target[nodes, 0] = values
+            #     if target_not_in_values:
+            #         continue
             x[nodes, i] = values
+        target[nodes, 0] = dataset_sample.values[molecule].loc[:, target_column].to_numpy().astype(np.float32)
     for i, column in enumerate(molecule_columns):
         i = i + num_value_columns
         values = node_molecule_values[column].to_numpy().astype(np.float32)
@@ -106,7 +108,7 @@ def populate_graph_dgl(
     node_molecule_labels = np.zeros((nodes_data.shape[0], int(nodes_data.max() + 1)), dtype=np.float32)
     node_molecule_labels[nodes_data.index.to_numpy(), nodes_data.to_numpy()] = 1
     # dgl_N = dgl.to_bidirected(dgl_N)
-    dgl_graph.nodes["molecule"].data["x"] = torch.from_numpy(np.append(x, node_molecule_labels, axis=1))
+    dgl_graph.nodes["molecule"].data["features"] = torch.from_numpy(np.append(x, node_molecule_labels, axis=1))
     dgl_graph.nodes["molecule"].data["target"] = torch.from_numpy(target)
     # for i, column in enumerate(value_columns):
     #    dgl_graph.nodes['molecule'].data[column] = torch.from_numpy(x[:, i]).unsqueeze(axis=1)

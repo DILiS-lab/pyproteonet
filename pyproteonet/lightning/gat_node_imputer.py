@@ -12,11 +12,11 @@ from dgl.dataloading import GraphDataLoader
 from ..data.abstract_masked_dataset import AbstractMaskedDataset
 from ..dgl.masked_dataset_adapter import MaskedDatasetAdapter
 from ..dgl.graph_key_dataset import GraphKeyDataset
-from .abstract_node_regressor import AbstractNodeRegressor
+from .abstract_node_imputer import AbstractNodeImputer
 from ..dgl.gnn_architectures.deep_gat import DeepGAT
 
 
-class GatNodeRegressor(AbstractNodeRegressor):
+class GatNodeImputer(AbstractNodeImputer):
     def __init__(
         self,
         in_dim: int = 3,

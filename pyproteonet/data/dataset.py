@@ -178,7 +178,7 @@ class Dataset:
     def copy(
         self,
         samples: Optional[List[str]] = None,
-        columns: Optional[List[str]] = None,
+        columns: Optional[Union[Iterable[str], Dict[str, Iterable[str]]]] = None,
         copy_molecule_set: bool = True,
         molecule_ids: Dict[str, pd.Index] = {},
     ):
