@@ -25,7 +25,9 @@ dependencies = [
     "rpy2==3.5.14",
     "fancyimpute",
     "numba",
-    "numba-progress"
+    "numba-progress",
+    "ipywidgets",
+    "statsmodels",
 ]
 [dev-dependencies]
 test = [

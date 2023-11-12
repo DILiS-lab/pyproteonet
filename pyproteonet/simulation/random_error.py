@@ -57,6 +57,7 @@ def multiply_exponential_gaussian(
     sigma: float = 0.33,
     inplace: bool = False,
     random_seed: Optional[Union[int, np.random.Generator]] = None,
+    ids: Optional[pd.Index] = None
 ) -> Dataset:
     """For every sample and value of the given molecule and column multiply the value by e**error, with error drawn from a normal distribution.
 
@@ -78,9 +79,13 @@ def multiply_exponential_gaussian(
         result_column = column
     rng = get_numpy_random_generator(seed=random_seed)
     for sample in dataset.samples:
-        vals = sample.values[molecule].loc[:, column]
-        error = rng.normal(loc=0, scale=sigma, size=len(vals))
-        vals = vals * np.exp(error)
+        vals = sample.values[molecule].loc[:, column].copy()
+        if ids is None:
+            error = rng.normal(loc=0, scale=sigma, size=len(vals))
+            vals = vals * np.exp(error)
+        else:
+            error = rng.normal(loc=0, scale=sigma, size=len(ids))
+            vals.loc[ids] = vals.loc[ids] * np.exp(error)
         sample.values[molecule][result_column] = vals
     return dataset
 

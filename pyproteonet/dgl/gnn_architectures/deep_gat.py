@@ -10,8 +10,17 @@ import matplotlib.pyplot as plt
 from .resettable_module import ResettableModule
 
 class DeepGAT(ResettableModule):
-	def __init__(self, in_dim, heads: List[int], gat_dims: List[int], out_dim: int = 1, use_gatv2: bool = False):
+	def __init__(self, in_dim, heads: List[int], gat_dims: List[int], out_dim: int = 1, use_gatv2: bool = False, initial_dense_layers: List[int] = []):
 		super().__init__()
+		if len(initial_dense_layers) > 0:
+			dense_layers = []
+			for dim in initial_dense_layers:
+				dense_layers.append(nn.Linear(in_dim, dim))
+				dense_layers.append(nn.ReLU())
+				in_dim = dim
+			self.initial_layers = nn.Sequential(*dense_layers)
+		else:
+			self.initial_layers = nn.Identity()
 		layers = []
 		assert len(gat_dims) == len(heads)
 		layer_type = GATConv
@@ -38,6 +47,7 @@ class DeepGAT(ResettableModule):
 	def forward(self, graph, feat, eweight = None):
 		#graph = dgl.to_homogeneous(graph, ndata = ['x'])
 		#feat = feat['molecule']
+		feat = self.initial_layers(feat)
 		for layer in self.gat_layers:
 			feat = layer(graph, feat)
 			feat = self.reshape_multihead_output(F.relu(feat))

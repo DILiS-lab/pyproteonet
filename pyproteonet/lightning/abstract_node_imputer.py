@@ -66,12 +66,13 @@ class AbstractNodeImputer(pl.LightningModule):
         #features_dict = {"molecule": torch.concat([target, features], axis=-1)}
         # Forward
         pred = self.model(graph, feat=torch.concat([target, features], axis=-1))
+        #import pdb; pdb.set_trace()
         return pred
 
     def _log_metrics(self, y: torch.tensor, target: torch.tensor, loss: torch.tensor, prefix: str):
         batch_size = 1  # TODO
-        #if self.out_dim > 1:
-        #    y = y[:, :, :self.num_abundance_features]
+        if self.out_dim > 1:
+            y = y[:, [0]]
         mae = F.l1_loss(y, target).item()
         mse = F.mse_loss(y, target).item()
         #pearson = (torch.corrcoef(torch.t(torch.cat((y, target), -1)))[0, 1]).item()

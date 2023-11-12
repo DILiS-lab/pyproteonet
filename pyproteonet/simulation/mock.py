@@ -54,9 +54,13 @@ class ProteinPeptideDatasetMocker:
         samples: int = None,
         simulate_missing: bool = True,
         random_seed: Optional[Union[int, np.random.Generator]] = None,
+        simulate_flyability = True,
+        log_protein_error_sigma: float = 0.3,
         noise_mnar_thresh_multiplier: float = 2,
         noise_mnar_thresh_std_multiplier: float = 1,
         mcar_frac: Optional[float] = None,
+        peptide_poisson_error: bool = True,
+        peptide_noise: bool = True,
         print_parameters: bool = False,
     ) -> Dataset:
         random_seed = get_numpy_random_generator(random_seed)
@@ -64,17 +68,21 @@ class ProteinPeptideDatasetMocker:
             samples = len(self.dataset.samples_dict)
         if molecule_set is None:
             molecule_set = self.dataset.molecule_set
+        if peptide_noise:
+            pep_noise_sigma = self.peptide_noise_level
+        else:
+            pep_noise_sigma = 0
         sim_ds = simulate_protein_peptide_dataset(
             molecule_set=molecule_set,
             samples=samples,
             log_abundance_mu=self.log_abundance_mean,
             log_abundance_sigma=self.log_abundance_std,
-            log_protein_error_sigma=0.3,
-            simulate_flyability=True,
+            log_protein_error_sigma=log_protein_error_sigma,
+            simulate_flyability=simulate_flyability,
             flyability_alpha=self.flyability_dist[0],
             flyability_beta=self.flyability_dist[1],
-            peptide_noise_sigma=self.peptide_noise_level,
-            peptide_poisson_error=True,
+            peptide_noise_sigma=pep_noise_sigma,
+            peptide_poisson_error=peptide_poisson_error,
             protein_column="abundance_gt",
             peptide_column="abundance",
             protein_molecule=self.protein_molecule,

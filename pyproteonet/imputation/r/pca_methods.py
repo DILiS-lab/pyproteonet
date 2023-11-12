@@ -12,6 +12,8 @@ from ...data.dataset import Dataset
 if not robjects.r('"BiocManager" %in% rownames(installed.packages())')[0]:
     robjects.r('install.packages("BiocManager", repos = "https://cloud.r-project.org")')
 bioc_manager = importr("BiocManager")
+if not robjects.r('"MsCoreUtils" %in% rownames(installed.packages())')[0]:
+    bioc_manager.install("MsCoreUtils", ask=False)
 if not robjects.r('"pcaMethods" %in% rownames(installed.packages())')[0]:
     bioc_manager.install("pcaMethods", ask=False)
 pca_methods = importr("pcaMethods")

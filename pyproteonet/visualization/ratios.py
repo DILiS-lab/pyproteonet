@@ -22,6 +22,7 @@ def plot_ratio_scatter(
     ids: Optional[pd.Index] = None,
     is_log: bool = True,
     plot_density: bool = False,
+    uncertainty_columns: Optional[List[str]] = None,
     s: float = 10,
     alpha: Optional[float] = None
 ):
@@ -36,7 +37,7 @@ def plot_ratio_scatter(
     if axs is None:
         fig, axs = plt.subplots(fig_rows, axs_columns, figsize=(13, 10))
         axs = axs.flatten()
-    for col, ax in zip(columns, axs):
+    for i, (col, ax) in enumerate(zip(columns, axs)):
         vals = dataset.values[molecule][col].unstack(level="sample")
         if ids is not None:
             vals = vals.loc[ids]
@@ -49,6 +50,10 @@ def plot_ratio_scatter(
         ratio = np.log2(vals_high / vals_low)
         abundance = (vals_high + vals_low) / 2
         abundance = np.log(abundance)
+        if uncertainty_columns is not None:
+            uncertainty_column = uncertainty_columns[i]
+            uncertainty = dataset.values[molecule][uncertainty_column].unstack(level="sample")
+            uncertainty = uncertainty[high_samples + low_samples].abs().mean(axis=1)
         non_na_mask = ~ratio.isna()
         for i, category in enumerate(unique_categories):
             if categories is not None:
@@ -61,6 +66,8 @@ def plot_ratio_scatter(
                 xy = np.vstack([ratio_plot, log_abundance_plot])
                 z = gaussian_kde(xy)(xy)
                 ax.scatter(ratio_plot, log_abundance_plot, s=s, c=z, label=f"{category}", marker=markers[i], alpha=alpha)
+            elif uncertainty_columns is not None:
+                ax.scatter(ratio_plot, log_abundance_plot, s=s, c=uncertainty[mask], label=f"{category}", marker=markers[i], alpha=alpha)
             else:
                 ax.scatter(ratio_plot, log_abundance_plot, s=s, label=f"{category}", alpha=alpha)
             ax.set_xlabel("$Log_2$(ratio)")

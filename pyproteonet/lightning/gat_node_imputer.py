@@ -22,12 +22,13 @@ class GatNodeImputer(AbstractNodeImputer):
         in_dim: int = 3,
         heads: int = [20,20],
         gat_dims: int = [40, 20],
+        initial_dense_layers: List[int] = [],
         out_dim: int = 1,
         loss: Literal["mse", "gnll"] = "mse",
         nan_substitute_value: float = 0.0,
         mask_substitute_value: float = 0.0,
         hide_substitute_value: float = 0.0,
-        lr: float = 0.0001,
+        lr: float = 0.01,
         use_gatv2: bool = False,
     ):
         super().__init__(
@@ -41,11 +42,11 @@ class GatNodeImputer(AbstractNodeImputer):
         if self.loss == "mse":
             self.loss_fn = torch.nn.MSELoss()
         elif self.loss == "gnll":
-            self.loss_fn = lambda y, target: F.gaussian_nll_loss(y[:, :, 0], target, torch.abs(y[:, :, 1]), eps=1e-4)
+            self.loss_fn = lambda y, target: F.gaussian_nll_loss(y[:, :out_dim], target, torch.abs(y[:, out_dim:]), eps=1e-1)
             self._out_dim = 2 * out_dim
         else:
-            raise AttributeError("Loss has to be 'mse', or 'nll'!")
-        self._model = DeepGAT(in_dim=in_dim, heads=heads, gat_dims=gat_dims, out_dim=self.out_dim, use_gatv2=use_gatv2)
+            raise AttributeError("Loss has to be 'mse', or 'gnll'!")
+        self._model = DeepGAT(in_dim=in_dim, heads=heads, gat_dims=gat_dims, out_dim=self.out_dim, use_gatv2=use_gatv2, initial_dense_layers=initial_dense_layers)
 
     @property
     def model(self):
