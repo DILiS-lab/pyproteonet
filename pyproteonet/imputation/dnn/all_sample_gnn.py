@@ -37,7 +37,7 @@ def impute_all_sample_gnn(
     early_stopping_patience: int = 5,
     missing_substitute_value: float = -3,
     use_gatv2: bool = True,
-    train_on_mapped: bool = False,
+    train_on_mapped: bool = True,
     uncertainty_column: Optional[str] = None,
 ):
     if mapping is None:
