@@ -24,8 +24,12 @@ Installation is best done within a Conda environment (you might also consider Ma
 It is advised to install the following requirements via Conda/Mamba because installing them via pip might lead to problems or because they are not available via pip:
 
 * r-base, ``conda install -c conda-forge r-base`` (you need an R installation because several provided imputation methods are wrappers around R packages)
-* Pytorch, ``conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia`` (see [the PyTorch website](https://pytorch.org/get-started/locally/) for instructions for your system and Cuda version) 
-* DGL, ``conda install -c dglteam dgl`` (see the [DGL website](https://www.dgl.ai/pages/start.html) for instructions for your system and Cuda version)
+* Pytorch, ``conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia`` (see the `PyTorch website <https://pytorch.org/get-started/locally/>`_) for instructions for your system and Cuda version) 
+* DGL, ``conda install -c dglteam dgl`` (see the `DGL website <https://www.dgl.ai/pages/start.html>`_) for instructions for your system and Cuda version)
 
 Afterward you can clone and install pyproteonet in the created Conda/Mamba environment via pip by running the following comman inside root the pyprotonet directory:
 ``pip install ./``
+
+Getting Started and Overview
+============================
+There is a `Getting Started Notebook <https://github.com/Tobias314/pyproteonet/blob/main/docs/source/notebooks/getting_started.ipynb>`_ which gives a first overview of how PyProteoNet can be used
