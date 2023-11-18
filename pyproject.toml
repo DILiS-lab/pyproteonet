@@ -28,6 +28,9 @@ dependencies = [
     "numba-progress",
     "ipywidgets",
     "statsmodels",
+    "python-kaleido",
+    "plotly",
+    "fastai",
 ]
 [dev-dependencies]
 test = [

@@ -90,7 +90,7 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         hide_substitute_value: float = 0.0,
         lr: float = 0.0001,
         use_gatv2: bool = False,
-        uncertainty_loss: bool = True
+        uncertainty_loss: bool = True,
     ):
         print(out_dim)
         super().__init__(

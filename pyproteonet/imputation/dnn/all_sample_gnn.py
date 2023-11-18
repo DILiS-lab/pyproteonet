@@ -33,12 +33,15 @@ def impute_all_sample_gnn(
     mapping: Optional[str] = None,
     result_column: Optional[str] = None,
     max_epochs: int = 10000,
-    validation_frequency: int = 50,
+    validation_frequency: int = 10,
     early_stopping_patience: int = 5,
     missing_substitute_value: float = -3,
     use_gatv2: bool = True,
     train_on_mapped: bool = True,
     uncertainty_column: Optional[str] = None,
+    logger: Optional[object] = None,
+    log_every_n_steps: int = 10,
+    protein_gt_column: Optional[str] = None,
 ):
     if mapping is None:
         protein_molecule, mapping, peptide_molecule = dataset.infer_mapping(
@@ -47,7 +50,9 @@ def impute_all_sample_gnn(
 
     in_dataset = dataset.copy(
         columns={
-            protein_molecule: [protein_abundance_column],
+            protein_molecule: [protein_abundance_column]
+            if protein_gt_column is None
+            else [protein_abundance_column, protein_gt_column],
             peptide_molecule: [peptide_abundance_column],
         }
     )
@@ -61,7 +66,19 @@ def impute_all_sample_gnn(
         molecules=[peptide_molecule],
         inplace=True,
     )
-    normalizer = DnnNormalizer(columns=["abundance"])
+    if protein_gt_column is not None:
+        in_dataset.rename_columns(
+            columns={protein_gt_column: "abundance_gt"},
+            molecules=[protein_molecule],
+            inplace=True,
+        )
+        in_dataset.values[peptide_molecule]["abundance_gt"] = in_dataset.values[peptide_molecule]["abundance"]
+        non_missing = in_dataset.values[protein_molecule]["abundance"]
+        gt = in_dataset.values[protein_molecule]["abundance_gt"]
+        mask = ~non_missing.isna()
+        gt[mask] = non_missing[mask]
+        in_dataset.values[protein_molecule]["abundance_gt"] = gt
+    normalizer = DnnNormalizer(columns=["abundance", "abundance_gt"])
     normalizer.normalize(dataset=in_dataset, inplace=True)
 
     train_ds, eval_ds = train_eval_protein_and_mapped(
@@ -87,6 +104,22 @@ def impute_all_sample_gnn(
     )
     train_dl = DataLoader(train_ds, batch_size=1, collate_fn=collate_fn)
     eval_dl = DataLoader([eval_ds], batch_size=1, collate_fn=collate_fn)
+    early_stopping_monitor = "validation_loss"
+    if protein_gt_column is not None:
+        gt_collate_fn = lambda masked_datasets: collator.collate(
+            masked_dataset_to_homogeneous_graph(
+                masked_datasets=masked_datasets,
+                mappings=[mapping],
+                target="abundance_gt",
+                features=[],
+            )
+        )
+        gt_ds = mask_missing(
+            dataset=in_dataset, molecule=protein_molecule, column="abundance"
+        )
+        gt_dl = DataLoader([gt_ds], batch_size=1, collate_fn=gt_collate_fn)
+        eval_dl = [eval_dl, gt_dl]
+        early_stopping_monitor = "validation_loss/dataloader_idx_0"
 
     num_samples = len(in_dataset.sample_names)
     heads = [num_samples, num_samples, num_samples]  # [4*num_samples]
@@ -108,18 +141,22 @@ def impute_all_sample_gnn(
         out_dim=num_samples,
         use_gatv2=use_gatv2,
         initial_dense_layers=[8 * num_samples, 2 * num_samples],
-        lr=0.001,
+        lr=0.01,
     )
 
+    if logger is None:
+        logger = ConsoleLogger()
     trainer = Trainer(
-        logger=ConsoleLogger(),
+        logger=logger,
         max_epochs=max_epochs,
         enable_checkpointing=False,
         check_val_every_n_epoch=validation_frequency,
-        log_every_n_steps=50,
+        log_every_n_steps=log_every_n_steps,
         callbacks=[
             EarlyStopping(
-                monitor="validation_loss", mode="min", patience=early_stopping_patience
+                monitor=early_stopping_monitor,
+                mode="min",
+                patience=early_stopping_patience,
             )
         ],
     )
@@ -133,10 +170,10 @@ def impute_all_sample_gnn(
             max_epochs=max_epochs,
             enable_checkpointing=False,
             check_val_every_n_epoch=validation_frequency,
-            log_every_n_steps=50,
+            log_every_n_steps=log_every_n_steps,
             callbacks=[
                 EarlyStopping(
-                    monitor="validation_loss",
+                    monitor=early_stopping_monitor,
                     mode="min",
                     patience=early_stopping_patience,
                 )

@@ -145,6 +145,10 @@ class Dataset:
         return self.samples_dict.values()
 
     @property
+    def num_samples(self) -> int:
+        return len(self.samples_dict)
+
+    @property
     def sample_names(self) -> List[str]:
         return self.names
 
@@ -329,7 +333,7 @@ class Dataset:
     def set_column_flat(
         self,
         molecule: str,
-        values: pd.Series,
+        values: Union[pd.Series, int, float],
         column: Optional[str] = None,
         allow_foreign_ids: bool = False,
         fill_missing: bool = False,
@@ -338,23 +342,27 @@ class Dataset:
 
         Args:
             molecule (str): The molecule type to set the values for.
-            values (pd.Series): The values to set (must be a pandas Series with a MultiIndex containing the levels "id" and "sample").
+            values (Union[pd.Series, int, float]): The values to set (must either be a pandas Series with a MultiIndex containing the levels "id" and "sample" or a single value).
             column (Optional[str], optional): If given this column name is used
                 otherwise the name of the Series is used as column name. Defaults to None.
         """
         if column is None:
             column = values.name
-        for name, group in values.groupby("sample"):
-            group = group.droplevel(level="sample")
-            sample_values = self.samples_dict[name].values[molecule]
-            if not allow_foreign_ids and not group.index.isin(sample_values.index).all():
-                raise KeyError(
-                    "Some of the provided values have ids that do not exist for this molecule."
-                    " If you want to ignore those set the allow_foreign_ids attribute."
-                )
-            if fill_missing:
-                sample_values[column] = self.missing_value
-            sample_values[column] = group
+        if isinstance(values, pd.Series):
+            for name, group in values.groupby("sample"):
+                group = group.droplevel(level="sample")
+                sample_values = self.samples_dict[name].values[molecule]
+                if not allow_foreign_ids and not group.index.isin(sample_values.index).all():
+                    raise KeyError(
+                        "Some of the provided values have ids that do not exist for this molecule."
+                        " If you want to ignore those set the allow_foreign_ids attribute."
+                    )
+                if fill_missing:
+                    sample_values[column] = self.missing_value
+                sample_values[column] = group
+        else:
+            for sample in self.samples:
+                sample.values[molecule][column] = values
 
     def get_samples_value_matrix(
         self,
