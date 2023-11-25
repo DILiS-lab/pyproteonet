@@ -13,6 +13,7 @@
       mappings
       molecules
       names
+      num_samples
       sample_names
       samples
    
