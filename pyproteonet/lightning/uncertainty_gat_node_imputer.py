@@ -23,12 +23,14 @@ class UncertaintyGAT(torch.nn.Module):
         out_dim: int = 1,
         use_gatv2: bool = False,
         initial_dense_layers: List[int] = [],
+        dropout: float = 0.0
     ):
         super().__init__()
         if len(initial_dense_layers) > 0:
             dense_layers = []
             for dim in initial_dense_layers:
                 dense_layers.append(nn.Linear(in_dim, dim))
+                dense_layers.append(nn.Dropout(p=dropout))
                 dense_layers.append(nn.ReLU())
                 in_dim = dim
             self.initial_layers = nn.Sequential(*dense_layers)
@@ -47,7 +49,7 @@ class UncertaintyGAT(torch.nn.Module):
                 last_d = gat_dims[i - 1]
                 last_h = heads[i - 1]
             layers.append(
-                layer_type(in_feats=last_d * last_h, out_feats=d, num_heads=h)
+                layer_type(in_feats=last_d * last_h, out_feats=d, num_heads=h, feat_drop=dropout, attn_drop=dropout)
             )
         self.gat_layers: List[layer_type] = nn.ModuleList(layers)
         self.out_layer = layer_type(
@@ -91,6 +93,7 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         lr: float = 0.0001,
         use_gatv2: bool = False,
         uncertainty_loss: bool = True,
+        dropout: float = 0.0
     ):
         print(out_dim)
         super().__init__(
@@ -107,6 +110,7 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
             out_dim=2 * out_dim,
             use_gatv2=use_gatv2,
             initial_dense_layers=initial_dense_layers,
+            dropout=dropout
         )
         self.uncertainty_loss = uncertainty_loss
 

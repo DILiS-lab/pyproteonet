@@ -10,13 +10,12 @@ from pyproteonet.lightning import ConsoleLogger
 from dgl.dataloading import GraphCollator
 
 from ...data.dataset import Dataset
-from ...masking.train_eval import train_eval_protein_and_mapped
+from ...masking.train_eval import train_eval_protein_and_mapped, train_eval_full_protein_and_mapped
 from ...normalization.dnn_normalizer import DnnNormalizer
 from ...dgl.collate import (
     masked_dataset_to_homogeneous_graph,
     masked_heterograph_to_homogeneous,
 )
-from ...lightning.gat_node_imputer import GatNodeImputer
 from ...lightning.uncertainty_gat_node_imputer import UncertaintyGatNodeImputer
 from ...masking.masking import mask_missing
 
@@ -81,7 +80,7 @@ def impute_all_sample_gnn(
     normalizer = DnnNormalizer(columns=["abundance", "abundance_gt"])
     normalizer.normalize(dataset=in_dataset, inplace=True)
 
-    train_ds, eval_ds = train_eval_protein_and_mapped(
+    train_ds, eval_ds = train_eval_full_protein_and_mapped(
         dataset=in_dataset,
         protein_abundance_column="abundance",
         peptide_abundance_column="abundance",
@@ -122,8 +121,10 @@ def impute_all_sample_gnn(
         early_stopping_monitor = "validation_loss/dataloader_idx_0"
 
     num_samples = len(in_dataset.sample_names)
-    heads = [num_samples, num_samples, num_samples]  # [4*num_samples]
-    dimensions = [4, 2, 2]  # [1]#, num_samples, num_samples]
+    # heads = [num_samples, num_samples]  # [num_samples]
+    # dimensions = [8 * num_smples, 4*num_samples, 2*num_samples]
+    heads = [4*num_samples, 4*num_samples, 4*num_samples]
+    dimensions = [8, 8, 4]  # [1]#, num_samples, num_samples]
     print(heads)
     print(dimensions)
     # module = GatNodeImputer(in_dim = num_samples + 2,
@@ -140,8 +141,9 @@ def impute_all_sample_gnn(
         nan_substitute_value=missing_substitute_value,
         out_dim=num_samples,
         use_gatv2=use_gatv2,
-        initial_dense_layers=[8 * num_samples, 2 * num_samples],
-        lr=0.01,
+        initial_dense_layers=[8 * num_samples, 2 * num_samples],#[8 * num_samples, 2 * num_samples]
+        dropout=0.2,
+        lr=0.0005,
     )
 
     if logger is None:

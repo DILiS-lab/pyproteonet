@@ -61,7 +61,7 @@ def populate_graph_dgl(
     for vcs in feature_columns.values():
         all_value_columns.extend(vcs)
     num_value_columns = max([len(columns) for _, columns in feature_columns.items()])
-    node_molecule_values = dataset_sample.molecule_set.get_node_values_for_graph(graph=graph, include_id_and_type=False)
+    node_molecule_values = dataset_sample.molecule_set.get_node_values_for_graph(graph=graph, include_id_and_type=False, columns=molecule_columns)
     num_nodes = dgl_graph.num_nodes("molecule")
     num_columns = num_value_columns + len(molecule_columns)
     x = np.full((num_nodes, num_columns), dataset_sample.missing_value, dtype=np.float32)

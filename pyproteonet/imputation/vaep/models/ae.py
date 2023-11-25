@@ -113,7 +113,6 @@ class Autoencoder(nn.Module):
 
         # Encoder
         self.encoder = []
-
         for i in range(len(self.layers)-1):
             in_feat, out_feat = self.layers[i:i+2]
             self.encoder.extend(build_layer(in_feat=in_feat,

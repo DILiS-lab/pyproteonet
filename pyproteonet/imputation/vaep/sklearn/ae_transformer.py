@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
 import sklearn
 
 from pathlib import Path
@@ -32,8 +32,9 @@ learner.Recorder.plot_loss = plot_loss
 
 default_pipeline = sklearn.pipeline.Pipeline(
     [
-        ('normalize', StandardScaler()),
-        ('impute', SimpleImputer(add_indicator=False))
+        #('normalize', StandardScaler()),
+        ('normalize', FunctionTransformer()),
+        ('impute', SimpleImputer(add_indicator=False, keep_empty_features=True))
     ])
 
 
@@ -107,9 +108,9 @@ class AETransformer(TransformerMixin, BaseEstimator):
         self.analysis.learn = Learner(dls=self.analysis.dls,
                                       model=self.analysis.model,
                                       loss_func=self.loss_fct,
-                                      cbs=cbs
+                                      cbs=cbs, 
+                                      model_dir = Path(self.out_folder) / 'models'
                                       )
-
         suggested_lr = self.analysis.learn.lr_find()
         self.analysis.params['suggested_inital_lr'] = suggested_lr.valley
         self.analysis.learn.fit_one_cycle(epochs_max, lr_max=suggested_lr.valley)

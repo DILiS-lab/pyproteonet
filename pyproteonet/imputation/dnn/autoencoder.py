@@ -1,8 +1,9 @@
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from tempfile import TemporaryDirectory
 
 import pandas as pd
 import torch
+import numpy as np
 
 from ...data.dataset import Dataset
 from ..vaep.sklearn.ae_transformer import AETransformer
@@ -17,6 +18,8 @@ def impute_auto_encoder(
     validation_fraction: float = 0.1,
     batch_size: int = 26,
     model_type: Literal["VAE", "DAE"] = "VAE",
+    hidden_layer_dimensions: List[int] = [512],
+    latent_dimension: int = 50,
     cuda: Optional[bool] = None
 ) -> pd.DataFrame:
     if cuda is None:
@@ -24,7 +27,11 @@ def impute_auto_encoder(
     df = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     df.index.name = "id"
     df.columns.name = "sample"
-    in_df = df
+    df = df
+    in_df = df.transpose()
+    mean = np.nanmean(in_df.values)
+    std = np.nanstd(in_df.values)
+    in_df = (in_df - mean) / std
     freq_feat = in_df.notna().sum()
     val_X, train_X = sample_data(
         in_df.stack(),
@@ -34,6 +41,7 @@ def impute_auto_encoder(
         random_state=42,
     )
     val_X, train_X = val_X.unstack(), train_X.unstack()
+    train_X = pd.DataFrame(train_X, index=in_df.index, columns=in_df.columns)
     val_X = pd.DataFrame(pd.NA, index=train_X.index, columns=train_X.columns).fillna(
         val_X
     )
@@ -42,19 +50,18 @@ def impute_auto_encoder(
     with TemporaryDirectory() as out_dir:
         model = AETransformer(
             model=model_type,
-            hidden_layers=[
-                512,
-            ],
-            latent_dim=50,
+            hidden_layers=hidden_layer_dimensions,
+            latent_dim=latent_dimension,
             out_folder=out_dir,
             batch_size=batch_size,
-            cuda = cuda
         )
-        model.fit(train_X, val_X, epochs_max=50, cuda=False)
+        model.fit(train_X, val_X, epochs_max=50, cuda=cuda)
         df_imputed = model.transform(in_df)
-        mask = ~df.isna()
-        df_imputed[mask] = df[mask]
-        df_imputed = df_imputed.stack().swaplevel()
+        mask = ~in_df.isna()
+        df_imputed[mask] = in_df[mask]
+        df_imputed = df_imputed * std + mean
+        df_imputed = df_imputed.transpose()
+        df_imputed = df_imputed.stack(dropna=False).swaplevel()
         if result_column is not None:
             dataset.values[molecule][result_column] = df_imputed
         assert df_imputed.isna().sum() == 0

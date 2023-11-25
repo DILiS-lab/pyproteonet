@@ -395,17 +395,20 @@ class MoleculeSet:
             self.graphs[mapping] = graph
         return graph
 
-    def get_node_values_for_graph(self, graph: MoleculeGraph, include_id_and_type: bool = True):
+    def get_node_values_for_graph(self, graph: MoleculeGraph, include_id_and_type: bool = True, columns: Optional[List[str]] = None):
         node_values = []
+        columns = set(columns)
         for node_type, df in graph.nodes.groupby("type"):
             key = graph.inverse_type_mapping[node_type]  # type: ignore
             values = self.molecules[key]
-            columns = list(values.columns)
-            df[columns] = values.loc[df.molecule_id, columns].values
+            df_columns = list(values.columns)
+            if columns is not None:
+                df_columns = [c for c in df_columns if c in columns]
+            df[df_columns] = values.loc[df.molecule_id, df_columns].values
             if include_id_and_type:
                 node_values.append(df)
             else:
-                node_values.append(df.loc[:, columns])
+                node_values.append(df.loc[:, df_columns])
         node_values = pd.concat(node_values)
         return node_values
 

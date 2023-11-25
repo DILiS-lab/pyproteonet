@@ -18,6 +18,8 @@ if not robjects.r('"pcaMethods" %in% rownames(installed.packages())')[0]:
     bioc_manager.install("pcaMethods", ask=False)
 pca_methods = importr("pcaMethods")
 ms_core_utils = importr("MsCoreUtils")
+base = importr("base")
+r_mat_mul = robjects.r['%*%']
 
 nan_to_na = robjects.r(
 """function(mat){
@@ -34,6 +36,8 @@ def impute_pca_method(
     n_pcs: Optional[int] = None,
     result_column: Optional[str] = None,
     molecules_as_variables: bool = False,
+    only_transform_missing: bool = True
+
 ):
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     if n_pcs is None:
@@ -47,7 +51,11 @@ def impute_pca_method(
         else:
             in_ = nan_to_na(mat_np[mask, :])
         res = pca_methods.pca(in_, method=method, nPcs=n_pcs, verbose=False)
-        res = pca_methods.completeObs(res)
+        if only_transform_missing:
+            res = pca_methods.completeObs(res)
+        else:
+            res = pca_methods.prep(r_mat_mul(res.slots['scores'], base.t(res.slots['loadings'])),
+                                   center = res.slots['center'], scale = res.slots['scale'], reverse = True)
         if molecules_as_variables:
             res = res.T
     mat_np[mask, :] = res
