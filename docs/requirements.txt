@@ -1,2 +1,2 @@
 sphinx-rtd-theme
-mys_nb
+myst_nb
