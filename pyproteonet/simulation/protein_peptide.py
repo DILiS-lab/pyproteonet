@@ -9,7 +9,7 @@ from .sampling import draw_normal_log_space
 from .modification import per_molecule_random_scaling, introduce_random_condition
 from .random_error import multiply_exponential_gaussian, add_positive_gaussian, poisson_error
 from ..processing.aggregation import neighbor_sum
-from pyproteonet.quantification.neighbor_summarization import neighbor_aggregation
+from pyproteonet.aggregation.neighbor_summarization import neighbor_aggregation
 
 
 def simulate_protein_peptide_dataset(

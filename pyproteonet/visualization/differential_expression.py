@@ -48,4 +48,6 @@ def plot_des_volcano(
         ax.set_ylabel('-$Log_{10}$(p_value)')
         ax.set_xlabel('$Log_2$(fold_change)')
         ax.legend()
+    for ax in axs[len(columns):]:
+        ax.set_axis_off()
     return des, p_values, fc

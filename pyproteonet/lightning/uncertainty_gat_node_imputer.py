@@ -154,7 +154,7 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
 
     def calculate_loss(self, pred, target):
         if self.uncertainty_loss:
-            return F.gaussian_nll_loss(pred[:, 0], target=target, var=torch.abs(pred[:, 1]), eps=1e-1)
+            return F.gaussian_nll_loss(pred[:, 0], target=target, var=torch.exp(pred[:, 1]))
         else:
             return F.mse_loss(pred[:, 0], target)
 

@@ -74,6 +74,8 @@ def plot_ratio_scatter(
             ax.set_ylabel("$Log_e$(abundance)")
         ax.legend()
         ax.set_title(col)
+    for ax in axs[len(columns):]:
+        ax.set_axis_off()
     return ratio_plot, log_abundance_plot
 
 

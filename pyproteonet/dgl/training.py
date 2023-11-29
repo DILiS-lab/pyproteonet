@@ -31,8 +31,8 @@ def train_node_regression(model: torch.nn.Module, train_data_set: GraphDataSet, 
             abundances = graph.nodes['molecule'].data['abundance']
             train_nodes = graph.ndata['mask']
             features_train = features.clone()
-            if 'hide' in graph.ndata:
-                to_hide = graph.ndata['hide']
+            if 'hidden' in graph.ndata:
+                to_hide = graph.ndata['hidden']
                 features_train[to_hide, 0] = hide_substitute_value
             features_train[train_nodes, 0] = mask_substitute_value
             features_train[features_train.isnan()] = nan_substitute_value
@@ -67,8 +67,8 @@ def train_node_regression(model: torch.nn.Module, train_data_set: GraphDataSet, 
                     abundances = graph.nodes['molecule'].data['abundance']
                     mask_nodes = graph.nodes['molecule'].data['mask']
                     features_test = features.clone()
-                    if 'hide' in graph.nodes['molecule'].data:
-                        to_hide = graph.nodes['molecule'].data['hide']
+                    if 'hidden' in graph.nodes['molecule'].data:
+                        to_hide = graph.nodes['molecule'].data['hidden']
                         features_test[to_hide, 0] = hide_substitute_value
                     features_test[mask_nodes, 0] = mask_substitute_value
                     features_test[features_test.isnan()] = nan_substitute_value

@@ -10,7 +10,11 @@ from pyproteonet.lightning import ConsoleLogger
 from dgl.dataloading import GraphCollator
 
 from ...data.dataset import Dataset
-from ...masking.train_eval import train_eval_protein_and_mapped, train_eval_full_protein_and_mapped
+from ...masking.train_eval import (
+    train_eval_protein_and_mapped,
+    train_eval_full_protein_and_mapped,
+    train_eval_full_protein_and_mapped_backup
+)
 from ...normalization.dnn_normalizer import DnnNormalizer
 from ...dgl.collate import (
     masked_dataset_to_homogeneous_graph,
@@ -22,14 +26,13 @@ from ...masking.masking import mask_missing
 
 def impute_all_sample_gnn(
     dataset: Dataset,
-    protein_abundance_column: str,
-    peptide_abundance_column: str,
+    molecule: str,
+    mapping: str,
+    column: str,
+    partner_column: str,
     validation_fraction=0.1,
-    training_fraction=0.5,
-    peptide_masking_fraction=0.5,
-    protein_molecule="protein",
-    peptide_molecule="peptide",
-    mapping: Optional[str] = None,
+    training_fraction=0.3,
+    partner_masking_fraction=0.5,
     result_column: Optional[str] = None,
     max_epochs: int = 10000,
     validation_frequency: int = 10,
@@ -41,55 +44,58 @@ def impute_all_sample_gnn(
     logger: Optional[object] = None,
     log_every_n_steps: int = 10,
     protein_gt_column: Optional[str] = None,
+    max_partner_mnar_quantile: float = 0.0,
 ):
-    if mapping is None:
-        protein_molecule, mapping, peptide_molecule = dataset.infer_mapping(
-            molecule=protein_molecule, mapping=peptide_molecule
-        )
+    molecule, mapping, peptide_molecule = dataset.infer_mapping(
+        molecule=molecule, mapping=mapping
+    )
 
     in_dataset = dataset.copy(
         columns={
-            protein_molecule: [protein_abundance_column]
+            molecule: [column]
             if protein_gt_column is None
-            else [protein_abundance_column, protein_gt_column],
-            peptide_molecule: [peptide_abundance_column],
+            else [column, protein_gt_column],
+            peptide_molecule: [partner_column],
         }
     )
     in_dataset.rename_columns(
-        columns={protein_abundance_column: "abundance"},
-        molecules=[protein_molecule],
+        columns={column: "abundance"},
+        molecules=[molecule],
         inplace=True,
     )
     in_dataset.rename_columns(
-        columns={peptide_abundance_column: "abundance"},
+        columns={partner_column: "abundance"},
         molecules=[peptide_molecule],
         inplace=True,
     )
     if protein_gt_column is not None:
         in_dataset.rename_columns(
             columns={protein_gt_column: "abundance_gt"},
-            molecules=[protein_molecule],
+            molecules=[molecule],
             inplace=True,
         )
-        in_dataset.values[peptide_molecule]["abundance_gt"] = in_dataset.values[peptide_molecule]["abundance"]
-        non_missing = in_dataset.values[protein_molecule]["abundance"]
-        gt = in_dataset.values[protein_molecule]["abundance_gt"]
+        in_dataset.values[peptide_molecule]["abundance_gt"] = in_dataset.values[
+            peptide_molecule
+        ]["abundance"]
+        non_missing = in_dataset.values[molecule]["abundance"]
+        gt = in_dataset.values[molecule]["abundance_gt"]
         mask = ~non_missing.isna()
         gt[mask] = non_missing[mask]
-        in_dataset.values[protein_molecule]["abundance_gt"] = gt
+        in_dataset.values[molecule]["abundance_gt"] = gt
     normalizer = DnnNormalizer(columns=["abundance", "abundance_gt"])
     normalizer.normalize(dataset=in_dataset, inplace=True)
 
-    train_ds, eval_ds = train_eval_full_protein_and_mapped(
+    train_ds, eval_ds = train_eval_full_protein_and_mapped_backup(
         dataset=in_dataset,
         protein_abundance_column="abundance",
         peptide_abundance_column="abundance",
         validation_fraction=validation_fraction,
         training_fraction=training_fraction,
-        peptide_masking_fraction=peptide_masking_fraction,
-        protein_molecule=protein_molecule,
+        peptide_masking_fraction=partner_masking_fraction,
+        protein_molecule=molecule,
         mapping=peptide_molecule,
         train_mapped=train_on_mapped,
+        max_mnar_quantile=max_partner_mnar_quantile,
     )
 
     collator = GraphCollator()
@@ -113,9 +119,7 @@ def impute_all_sample_gnn(
                 features=[],
             )
         )
-        gt_ds = mask_missing(
-            dataset=in_dataset, molecule=protein_molecule, column="abundance"
-        )
+        gt_ds = mask_missing(dataset=in_dataset, molecule=molecule, column="abundance")
         gt_dl = DataLoader([gt_ds], batch_size=1, collate_fn=gt_collate_fn)
         eval_dl = [eval_dl, gt_dl]
         early_stopping_monitor = "validation_loss/dataloader_idx_0"
@@ -123,7 +127,7 @@ def impute_all_sample_gnn(
     num_samples = len(in_dataset.sample_names)
     # heads = [num_samples, num_samples]  # [num_samples]
     # dimensions = [8 * num_smples, 4*num_samples, 2*num_samples]
-    heads = [4*num_samples, 4*num_samples, 4*num_samples]
+    heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
     dimensions = [8, 8, 4]  # [1]#, num_samples, num_samples]
     print(heads)
     print(dimensions)
@@ -141,34 +145,38 @@ def impute_all_sample_gnn(
         nan_substitute_value=missing_substitute_value,
         out_dim=num_samples,
         use_gatv2=use_gatv2,
-        initial_dense_layers=[8 * num_samples, 2 * num_samples],#[8 * num_samples, 2 * num_samples]
+        initial_dense_layers=[
+            8 * num_samples,
+            2 * num_samples,
+        ],  # [8 * num_samples, 2 * num_samples]
         dropout=0.2,
         lr=0.0005,
     )
 
     if logger is None:
         logger = ConsoleLogger()
-    trainer = Trainer(
-        logger=logger,
-        max_epochs=max_epochs,
-        enable_checkpointing=False,
-        check_val_every_n_epoch=validation_frequency,
-        log_every_n_steps=log_every_n_steps,
-        callbacks=[
-            EarlyStopping(
-                monitor=early_stopping_monitor,
-                mode="min",
-                patience=early_stopping_patience,
-            )
-        ],
-    )
     module.uncertainty_loss = False
-    trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=eval_dl)
-    if uncertainty_column is not None:
+    if uncertainty_column is None:
+        trainer = Trainer(
+            logger=logger,
+            max_epochs=max_epochs,
+            enable_checkpointing=False,
+            check_val_every_n_epoch=validation_frequency,
+            log_every_n_steps=log_every_n_steps,
+            callbacks=[
+                EarlyStopping(
+                    monitor=early_stopping_monitor,
+                    mode="min",
+                    patience=early_stopping_patience,
+                )
+            ],
+        )
+        trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=eval_dl)
+    else:
         module.uncertainty_loss = True
         module.lr = 0.0001
         trainer = Trainer(
-            logger=ConsoleLogger(),
+            logger=logger,
             max_epochs=max_epochs,
             enable_checkpointing=False,
             check_val_every_n_epoch=validation_frequency,
@@ -183,9 +191,7 @@ def impute_all_sample_gnn(
         )
         trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=eval_dl)
 
-    predict_ds = mask_missing(
-        dataset=in_dataset, molecule=protein_molecule, column="abundance"
-    )
+    predict_ds = mask_missing(dataset=in_dataset, molecule=molecule, column="abundance")
     predict_graph = predict_ds.to_dgl_graph(
         molecule_features={
             mol: ["abundance"] for mol in predict_ds.dataset.molecules.keys()
@@ -196,7 +202,7 @@ def impute_all_sample_gnn(
     predict_graph = masked_heterograph_to_homogeneous(
         masked_heterographs=[predict_graph], target="abundance", features=[]
     )[0]
-    protein_index = ntypes.index(protein_molecule)
+    protein_index = ntypes.index(molecule)
     protein_mask = (predict_graph.ndata[dgl.NTYPE] == protein_index).type(torch.bool)
     res = trainer.predict(
         module, DataLoader([predict_graph], batch_size=1, collate_fn=collator.collate)
@@ -206,27 +212,25 @@ def impute_all_sample_gnn(
     protein_ids = predict_graph.ndata[dgl.NID][protein_mask].type(torch.int64)
     prot_res = prot_res[protein_ids, :]
     masked_proteins = masked_proteins[protein_ids, :]
-    mat_pd = in_dataset.get_samples_value_matrix(
-        molecule=protein_molecule, column="abundance"
-    )
+    mat_pd = in_dataset.get_samples_value_matrix(molecule=molecule, column="abundance")
     mat = mat_pd.to_numpy()
     mat[masked_proteins.numpy()] = prot_res[masked_proteins].numpy()[:, 0]
     # mat[:, :] = prot_res[:, :].numpy()
     mat_pd.loc[:, :] = mat
     in_dataset.set_samples_value_matrix(
-        matrix=mat_pd, molecule=protein_molecule, column="abundance"
+        matrix=mat_pd, molecule=molecule, column="abundance"
     )
     normalizer.unnormalize(dataset=in_dataset, inplace=True)
-    vals = dataset.values[protein_molecule][protein_abundance_column]
-    res_vals = in_dataset.values[protein_molecule]["abundance"]
+    vals = dataset.values[molecule][column]
+    res_vals = in_dataset.values[molecule]["abundance"]
     vals.loc[vals.isna(), :] = res_vals.loc[vals.isna(), :]
     if result_column is not None:
-        dataset.values[protein_molecule][result_column] = vals
+        dataset.values[molecule][result_column] = vals
     if uncertainty_column is not None:
         mat[:, :] = np.nan
         mat[masked_proteins.numpy()] = prot_res[masked_proteins].numpy()[:, 1]
         mat_pd.loc[:, :] = mat
         dataset.set_samples_value_matrix(
-            matrix=mat_pd, molecule=protein_molecule, column=uncertainty_column
+            matrix=mat_pd, molecule=molecule, column=uncertainty_column
         )
     return vals

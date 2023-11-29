@@ -53,8 +53,8 @@ class AbstractNodeImputer(pl.LightningModule):
         target = graph.ndata["target"].float().clone()
         features = graph.ndata["features"].float()
         mask_nodes = graph.ndata["mask"]
-        if "hide" in graph.ndata:
-            to_hide = graph.ndata["hide"]
+        if "hidden" in graph.ndata:
+            to_hide = graph.ndata["hidden"]
             #if len(to_hide.shape) == 1:
             #    to_hide = torch.unsqueeze(to_hide, dim=-1)
             target[to_hide] = self.hide_substitute_value

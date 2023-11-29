@@ -1,5 +1,5 @@
 from ..data.dataset import Dataset
-from ..quantification.neighbor_summarization import neighbor_top_n_mean, neighbor_aggregation
+from ..aggregation.neighbor_summarization import neighbor_top_n_mean, neighbor_aggregation
 
 import pandas as pd
 
