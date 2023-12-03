@@ -13,7 +13,9 @@ from ...data.dataset import Dataset
 from ...masking.train_eval import (
     train_eval_protein_and_mapped,
     train_eval_full_protein_and_mapped,
-    train_eval_full_protein_and_mapped_backup
+    train_eval_full_protein_and_mapped_backup,
+    train_eval_full_molecule,
+    train_eval_full_molecule_some_mapped
 )
 from ...normalization.dnn_normalizer import DnnNormalizer
 from ...dgl.collate import (
@@ -21,7 +23,7 @@ from ...dgl.collate import (
     masked_heterograph_to_homogeneous,
 )
 from ...lightning.uncertainty_gat_node_imputer import UncertaintyGatNodeImputer
-from ...masking.masking import mask_missing
+from ...masking.missing_values import mask_missing
 
 
 def impute_all_sample_gnn(
@@ -58,18 +60,18 @@ def impute_all_sample_gnn(
             peptide_molecule: [partner_column],
         }
     )
-    in_dataset.rename_columns(
+    in_dataset.rename_values(
         columns={column: "abundance"},
         molecules=[molecule],
         inplace=True,
     )
-    in_dataset.rename_columns(
+    in_dataset.rename_values(
         columns={partner_column: "abundance"},
         molecules=[peptide_molecule],
         inplace=True,
     )
     if protein_gt_column is not None:
-        in_dataset.rename_columns(
+        in_dataset.rename_values(
             columns={protein_gt_column: "abundance_gt"},
             molecules=[molecule],
             inplace=True,
@@ -82,20 +84,28 @@ def impute_all_sample_gnn(
         mask = ~non_missing.isna()
         gt[mask] = non_missing[mask]
         in_dataset.values[molecule]["abundance_gt"] = gt
-    normalizer = DnnNormalizer(columns=["abundance", "abundance_gt"])
+    normalizer = DnnNormalizer(columns=["abundance", "abundance_gt"], logarithmize=False)
     normalizer.normalize(dataset=in_dataset, inplace=True)
 
-    train_ds, eval_ds = train_eval_full_protein_and_mapped_backup(
+    # train_ds, eval_ds = train_eval_full_molecule_some_mapped(
+    #     dataset=in_dataset,
+    #     molecule=molecule,
+    #     column="abundance",
+    #     partner_column="abundance",
+    #     mapping=mapping,
+    #     validation_fraction=validation_fraction,
+    #     training_fraction=training_fraction,
+    #     partner_hide_fraction=partner_masking_fraction,
+    # )
+    train_ds, eval_ds = train_eval_full_protein_and_mapped(
         dataset=in_dataset,
-        protein_abundance_column="abundance",
-        peptide_abundance_column="abundance",
+        molecule=molecule,
+        column="abundance",
+        partner_column="abundance",
+        mapping=mapping,
         validation_fraction=validation_fraction,
         training_fraction=training_fraction,
-        peptide_masking_fraction=partner_masking_fraction,
-        protein_molecule=molecule,
-        mapping=peptide_molecule,
-        train_mapped=train_on_mapped,
-        max_mnar_quantile=max_partner_mnar_quantile,
+        partner_masking_fraction=partner_masking_fraction,
     )
 
     collator = GraphCollator()
@@ -127,8 +137,10 @@ def impute_all_sample_gnn(
     num_samples = len(in_dataset.sample_names)
     # heads = [num_samples, num_samples]  # [num_samples]
     # dimensions = [8 * num_smples, 4*num_samples, 2*num_samples]
-    heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
-    dimensions = [8, 8, 4]  # [1]#, num_samples, num_samples]
+    #heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
+    heads = [8 * num_samples]
+    dimensions = [8]
+    #dimensions = [8, 8, 4] # [1]#, num_samples, num_samples]
     print(heads)
     print(dimensions)
     # module = GatNodeImputer(in_dim = num_samples + 2,
@@ -147,7 +159,7 @@ def impute_all_sample_gnn(
         use_gatv2=use_gatv2,
         initial_dense_layers=[
             8 * num_samples,
-            2 * num_samples,
+            2 * num_samples
         ],  # [8 * num_samples, 2 * num_samples]
         dropout=0.2,
         lr=0.0005,

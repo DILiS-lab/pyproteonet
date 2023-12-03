@@ -67,7 +67,7 @@ def logarithmize(
     columns: Optional[Iterable[str]] = None,
     epsilon: float = 0.0,
 ):
-    return apply(data, _logarithmize, molecules=molecules, columns=columns)
+    return apply(data, _logarithmize, molecules=molecules, columns=columns, epsilon=epsilon)
 
 
 def _rename_values(
@@ -89,6 +89,25 @@ def rename_values(
     inplace: bool = False,
 ):
     res = apply(data, _rename_values, columns=columns, molecules=molecules, inplace=inplace)
+    if not inplace:
+        return res
+
+def _rename_columns(
+    sample: "DatasetSample", columns: Dict[str, Dict[str, str]], inplace: bool = False
+):
+    if not inplace:
+        sample = sample.copy()
+    for mol, cols in columns.items():
+        sample.values[mol].rename(columns=cols, inplace=True)
+    return sample
+
+
+def rename_columns(
+    dataset: Union["DatasetSample", "Dataset"],
+    columns: Dict[str, Dict[str, str]],
+    inplace: bool = False,
+):
+    res = apply(dataset, _rename_columns, columns=columns,inplace=inplace)
     if not inplace:
         return res
 

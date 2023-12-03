@@ -56,18 +56,6 @@ def mask_molecule_iterable(
     MaskedDatasetIterable(dataset=dataset, mask_function=sample, molecule=molecule, has_hidden=hidden_ids is not None)
 
 
-def mask_missing(
-    dataset: Dataset,
-    molecule: str = "protein",
-    column: str = "abundance",
-) -> MaskedDataset:
-    mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
-    for sample_name, sample in dataset.samples_dict.items():
-        mask[sample_name] = False
-        mask.loc[sample.missing_mask(molecule=molecule, column=column), sample_name] = True
-    return MaskedDataset(dataset=dataset, masks={molecule: mask})
-
-
 def mask_non_missing(
     dataset: Dataset,
     molecule: str,

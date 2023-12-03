@@ -1,5 +1,6 @@
 from typing import Union, Callable, Optional
 
+import numpy as np
 import pandas as pd
 from pandas.core.groupby.generic import SeriesGroupBy
 
@@ -28,8 +29,10 @@ def neighbor_aggregation(
     molecule: str,
     partner_column: str,
     mapping: str,
-    method: Union[Callable[[SeriesGroupBy], pd.Series], str],
+    method: Union[Callable[[SeriesGroupBy], pd.Series], str] = 'sum',
     only_unique: bool = True,
+    result_column: Optional[str] = None,
+    is_log: bool = False,
 ) -> pd.Series:
     if isinstance(method, str):
         method = method.lower()
@@ -48,9 +51,15 @@ def neighbor_aggregation(
     else:
         ag_fn = method
     mapped = _get_mapped(dataset=dataset, molecule=molecule, mapping=mapping, partner_column=partner_column, only_unique=only_unique)
+    if is_log:
+        mapped['quanti'] = np.exp(mapped['quanti'])
     group = mapped.quanti.groupby(['sample', molecule])
     res = ag_fn(group)
     res.index.set_names('id', level=1, inplace=True)
+    if is_log:
+        res = np.log(res)
+    if result_column is not None:
+        dataset.values[molecule][result_column] = res
     return res
 
 def neighbor_top_n_mean(
@@ -61,15 +70,20 @@ def neighbor_top_n_mean(
     top_n: int = 3,
     only_unique: bool = True,
     result_column: Optional[str] = None,
-    skip_if_less_than_n: bool = True
+    skip_if_less_than_n: bool = True,
+    is_log: bool = False,
 )->Optional[pd.Series]:
     mapped = _get_mapped(dataset=dataset, molecule=molecule, mapping=mapping, partner_column=partner_column, only_unique=only_unique)
+    if is_log:
+        mapped['quanti'] = np.exp(mapped['quanti'])
     group = mapped.quanti.sort_values(ascending=False).groupby(['sample', molecule]).head(top_n).groupby(['sample',molecule])
     if skip_if_less_than_n:
         res = group.mean()[group.count() >= top_n]
     else:
         res = group.mean()
     res.index.set_names('id', level=1, inplace=True)
+    if is_log:
+        res = np.log(res)
     if result_column is not None:
         dataset.set_column_flat(molecule=molecule, values=res, column=result_column, fill_missing=True)
     return res

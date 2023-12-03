@@ -31,7 +31,7 @@ class DatasetSample:
     # def create_graph_nodes_edges(self):
     #     return self.molecule_set.create_graph_nodes_edges()
 
-    def copy(self, columns: Optional[Union[Iterable[str],Dict[str, Iterable[str]]]] = None, molecule_ids: Dict[str, pd.Index] = {}):
+    def copy(self, columns: Optional[Union[Iterable[str],Dict[str, Union[str, Iterable[str]]]]] = None, molecule_ids: Dict[str, pd.Index] = {}):
         new_values = {}
         for molecule, df in self.values.items():
             if isinstance(columns, dict):
@@ -41,6 +41,8 @@ class DatasetSample:
             if cs is None:
                 cs = df.keys()
             else:
+                if isinstance(cs, str):
+                    cs = [cs]
                 cs = [c for c in cs if c in df.keys()]
             df = df.loc[:, list(cs)]
             if molecule in molecule_ids:

@@ -6,8 +6,9 @@ import pandas as pd
 from ..data.dataset import Dataset
 
 class DnnNormalizer:
-    def __init__(self, columns: List[str]):
+    def __init__(self, columns: List[str], logarithmize: bool = False):
         self.columns = columns
+        self.logarithmize = logarithmize
         self.means = {}
         self.stds = {}
 
@@ -20,7 +21,9 @@ class DnnNormalizer:
             for c in self.columns:
                 if c not in df.columns:
                     continue
-                vals = np.log(df[c])
+                vals = df[c]
+                if self.logarithmize:
+                    vals = np.log(vals)
                 mean, std = vals.mean(), vals.std()
                 dataset.values[mol][c] = (vals - mean) / std
                 col_means[c] = mean
@@ -39,6 +42,8 @@ class DnnNormalizer:
                 if c not in df.columns:
                     continue
                 vals = df[c]
-                vals = np.exp((vals * col_stds[c]) + col_means[c])
+                vals = (vals * col_stds[c]) + col_means[c]
+                if self.logarithmize:
+                    vals = np.exp(vals)
                 dataset.values[mol][c] = vals
         return dataset

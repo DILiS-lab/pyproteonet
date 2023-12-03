@@ -13,11 +13,11 @@ from pathlib import Path
 import json
 
 
-from .molecule_set import MoleculeSet
+from .molecule_set import MoleculeSet, MoleculeMapping
 from .dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
 from ..utils.pandas import matrix_to_multiindex
-from ..processing.dataset_transforms import rename_values, drop_values
+from ..processing.dataset_transforms import rename_values, drop_values, rename_columns
 
 
 class DatasetMoleculeValues:
@@ -161,7 +161,7 @@ class Dataset:
         return self.molecule_set.molecules
 
     @property
-    def mappings(self) -> Dict[str, Dict[str, pd.DataFrame]]:
+    def mappings(self) -> Dict[str, MoleculeMapping]:
         return self.molecule_set.mappings
 
     def number_molecules(self, molecule: str) -> int:
@@ -182,7 +182,7 @@ class Dataset:
     def copy(
         self,
         samples: Optional[List[str]] = None,
-        columns: Optional[Union[Iterable[str], Dict[str, Iterable[str]]]] = None,
+        columns: Optional[Union[Iterable[str],Dict[str, Union[str, Iterable[str]]]]] = None,
         copy_molecule_set: bool = True,
         molecule_ids: Dict[str, pd.Index] = {},
     ):
@@ -382,7 +382,11 @@ class Dataset:
             res = self.molecules[molecule].loc[:, []].copy()
         for name in samples:
             res[name] = self.missing_value
-            res.loc[:, name] = self.samples_dict[name].values[molecule].loc[:, column]
+            sample_df = self.samples_dict[name].values[molecule]
+            if column in sample_df.columns:
+                res.loc[:, name] = sample_df.loc[:, column]
+            else:
+                res.loc[:, name] = self.missing_value
         if molecule_columns:
             res.loc[:, molecule_columns] = self.molecules[molecule].loc[:, molecule_columns]
         return res
@@ -404,7 +408,10 @@ class Dataset:
             del sample.values[molecule]
         self.molecule_set.rename_molecule(molecule=molecule, new_name=new_name)
 
-    def rename_columns(self, columns: Dict[str, str], molecules: Optional[List[str]] = None, inplace: bool = False):
+    def rename_columns(self, columns: Dict[str, Dict[str, str]], inplace: bool = False)->Optional['Dataset']:
+        return rename_columns(dataset=self, columns=columns, inplace=inplace)
+
+    def rename_values(self, columns: Dict[str, str], molecules: Optional[List[str]] = None, inplace: bool = False):
         return rename_values(data=self, columns=columns, molecules=molecules, inplace=inplace)
 
     def drop_values(self, columns: List[str], molecules: Optional[List[str]] = None, inplace: bool = False):
