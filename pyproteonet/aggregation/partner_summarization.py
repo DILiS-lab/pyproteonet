@@ -24,7 +24,7 @@ def _get_mapped(
         mapped = mapped[mapped.deg==1]
     return mapped
 
-def neighbor_aggregation(
+def partner_aggregation(
     dataset: Dataset,
     molecule: str,
     partner_column: str,
@@ -62,7 +62,7 @@ def neighbor_aggregation(
         dataset.values[molecule][result_column] = res
     return res
 
-def neighbor_top_n_mean(
+def partner_top_n_mean(
     dataset: Dataset,
     molecule: str,
     mapping: str,

@@ -18,6 +18,7 @@ from .dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
 from ..utils.pandas import matrix_to_multiindex
 from ..processing.dataset_transforms import rename_values, drop_values, rename_columns
+from ..io.io import read_mapped_dataframe
 
 
 class DatasetMoleculeValues:
@@ -61,7 +62,11 @@ class Dataset:
         for name, sample in self.samples_dict.items():
             sample.dataset = self
             sample.name = name
-        self.values = {molecule: DatasetMoleculeValues(self, molecule) for molecule in self.molecules.keys()}
+        self.values = {
+            molecule: DatasetMoleculeValues(self, molecule)
+            for molecule in self.molecules.keys()
+        }
+        self._dgl_graph = None
 
     @classmethod
     def load(cls, dir_path: Union[str, Path]):
@@ -82,6 +87,31 @@ class Dataset:
                     values[molecule.strip("/")] = store[molecule]
             ds.create_sample(name=sample_path.stem, values=values)
         return ds
+
+    @classmethod
+    def from_mapped_dataframe(
+        cls,
+        df: pd.DataFrame,
+        molecule: str,
+        sample_columns: List[str],
+        id_column: Optional[str] = None,
+        result_column_name: str = "abundance",
+        mapping_column: Optional[str] = None,
+        mapping_sep: str = ",",
+        mapping_molecule: str = "protein",
+        mapping_name="peptide-protein",
+    ) -> "Dataset":
+        return read_mapped_dataframe(
+            df=df,
+            molecule=molecule,
+            sample_columns=sample_columns,
+            id_column=id_column,
+            result_column_name=result_column_name,
+            mapping_column=mapping_column,
+            mapping_sep=mapping_sep,
+            mapping_molecule=mapping_molecule,
+            mapping_name=mapping_name,
+        )
 
     def save(self, dir_path: Union[str, Path], overwrite: bool = False):
         dir_path = Path(dir_path)
@@ -120,7 +150,12 @@ class Dataset:
                 )
                 vals.index.set_names(index_name, inplace=True)
                 vals = vals.reset_index()
-                vals.to_csv(output_dir / f"{molecule}_{column}.tsv", sep="\t", na_rep=na_rep, index=False)
+                vals.to_csv(
+                    output_dir / f"{molecule}_{column}.tsv",
+                    sep="\t",
+                    na_rep=na_rep,
+                    index=False,
+                )
 
     def __getitem__(self, sample_name: str) -> DatasetSample:
         return self.samples_dict[sample_name]
@@ -133,10 +168,16 @@ class Dataset:
                 values[mol] = pd.DataFrame(index=mol_df.index)
             else:
                 if not values[mol].index.isin(mol_df.index).all():
-                    raise ValueError(f"The dataframe for molecule {mol} contains an index which is not in the molecule set's molecule ids for {mol}.")
+                    raise ValueError(
+                        f"The dataframe for molecule {mol} contains an index which is not in the molecule set's molecule ids for {mol}."
+                    )
                 values[mol] = pd.DataFrame(data=values[mol], index=mol_df.index)
             values[mol].index.name = "id"
-        for key, vals in [(key, vals) for key, vals in values.items() if key not in self.molecules.keys()]:
+        for key, vals in [
+            (key, vals)
+            for key, vals in values.items()
+            if key not in self.molecules.keys()
+        ]:
             values[key] = vals
         self.samples_dict[name] = DatasetSample(dataset=self, values=values, name=name)
 
@@ -182,7 +223,9 @@ class Dataset:
     def copy(
         self,
         samples: Optional[List[str]] = None,
-        columns: Optional[Union[Iterable[str],Dict[str, Union[str, Iterable[str]]]]] = None,
+        columns: Optional[
+            Union[Iterable[str], Dict[str, Union[str, Iterable[str]]]]
+        ] = None,
         copy_molecule_set: bool = True,
         molecule_ids: Dict[str, pd.Index] = {},
     ):
@@ -198,11 +241,15 @@ class Dataset:
             molecule_set = molecule_set.copy(molecule_ids=molecule_ids)
         return Dataset(molecule_set=molecule_set, samples=copied)
 
-    def get_molecule_subset(
-        self, molecule: str, ids: pd.Index):
+    def get_molecule_subset(self, molecule: str, ids: pd.Index):
         return self.copy(molecule_ids={molecule: ids}, copy_molecule_set=True)
 
-    def all_values(self, molecule: str, column: str = "abundance", return_missing_mask: bool = False):
+    def all_values(
+        self,
+        molecule: str,
+        column: str = "abundance",
+        return_missing_mask: bool = False,
+    ):
         values = []
         mask = []
         for sample in self.samples_dict.values():
@@ -215,7 +262,25 @@ class Dataset:
             return values, np.concatenate(mask)
         return values
 
-    def get_values_flat(self, molecule: str, columns: Optional[List[str]] = None, molecule_columns: List[str] = []):
+    def lf(
+        self,
+        molecule: str,
+        columns: Optional[List[str]] = None,
+        molecule_columns: List[str] = [],
+    ):
+        return self.get_values_flat(
+            molecule=molecule, columns=columns, molecule_columns=molecule_columns
+        )
+
+    def wf(self, molecule: str, column: str):
+        return self.get_samples_value_matrix(molecule=molecule, column=column)
+
+    def get_values_flat(
+        self,
+        molecule: str,
+        columns: Optional[List[str]] = None,
+        molecule_columns: List[str] = [],
+    ):
         sample_names, df = [], []
         for name, sample in self.samples_dict.items():
             if columns is None:
@@ -224,7 +289,9 @@ class Dataset:
                 values = sample.values[molecule][columns].copy()
             if molecule_columns:
                 if set.intersection(set(values.columns), set(molecule_columns)):
-                    raise AttributeError("There are columns and molecule columns with identical name")
+                    raise AttributeError(
+                        "There are columns and molecule columns with identical name"
+                    )
                 values[molecule_columns] = self.molecules[molecule][molecule_columns]
             sample_names.extend(np.full(len(values), name))
             df.append(values)
@@ -245,13 +312,21 @@ class Dataset:
         molecule: str,
         mapping: str,
         partner_molecule: str = None,
-        columns: List[str] = [],
+        columns: Union[str, List[str]] = [],
         samples: Optional[List] = None,
-        partner_columns: List[str] = [],
-        molecule_columns: List[str] = [],
-        molecule_columns_partner: List[str] = [],
+        partner_columns: Union[str, List[str]] = [],
+        molecule_columns: Union[str, List[str]] = [],
+        molecule_columns_partner: Union[str, List[str]] = [],
         return_partner_index_name: bool = False,
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
+        if isinstance(columns, str):
+            columns = [columns]
+        if isinstance(partner_columns, str):
+            partner_columns = [partner_columns]
+        if isinstance(molecule_columns, str):
+            molecule_columns = [molecule_columns]
+        if isinstance(molecule_columns_partner, str):
+            molecule_columns_partner = [molecule_columns_partner]
         # if not columns:
         #    raise AttributeError("The list of columns needs to contain at least one column!")
         mapping = self.molecule_set.get_mapping(
@@ -269,7 +344,9 @@ class Dataset:
         if samples is None:
             samples = self.sample_names
         if "sample" in mapping.df.index.names:
-            raise RuntimeError("ERROR")  # TODO: this should never happen, so we might remove it
+            raise RuntimeError(
+                "ERROR"
+            )  # TODO: this should never happen, so we might remove it
             sample_maps = {
                 sample: m.set_index([molecule, partner_molecule])
                 for sample, m in mapped.groupby("sample")
@@ -287,7 +364,12 @@ class Dataset:
         res = []
         for sample, map in sample_maps.items():
             vals = map.copy()
-            vals[columns] = self.samples_dict[sample].values[molecule].loc[map.index.get_level_values(0), columns].values
+            vals[columns] = (
+                self.samples_dict[sample]
+                .values[molecule]
+                .loc[map.index.get_level_values(0), columns]
+                .values
+            )
             if partner_columns:
                 partner_vals = (
                     self.samples_dict[sample]
@@ -314,7 +396,11 @@ class Dataset:
         drop_sample_id: bool = False,
     ):
         vals = self.get_samples_value_matrix(
-            molecule=molecule, column=column, molecule_columns=[], samples=samples, ids=ids
+            molecule=molecule,
+            column=column,
+            molecule_columns=[],
+            samples=samples,
+            ids=ids,
         )
         vals = matrix_to_multiindex(vals)
         if drop_sample_id:
@@ -325,7 +411,9 @@ class Dataset:
             return vals
 
     def missing_mask(self, molecule: str, column: str = "abundance"):
-        return eq_nan(self.get_column_flat(molecule=molecule, column=column), self.missing_value)
+        return eq_nan(
+            self.get_column_flat(molecule=molecule, column=column), self.missing_value
+        )
 
     def non_missing_mask(self, molecule: str, column: str = "abundance"):
         return ~self.missing_mask(molecule=molecule, column=column)
@@ -335,7 +423,7 @@ class Dataset:
         molecule: str,
         values: Union[pd.Series, int, float],
         column: Optional[str] = None,
-        allow_foreign_ids: bool = False,
+        skip_foreign_ids: bool = False,
         fill_missing: bool = False,
     ):
         """Sets values from a Pandas Series which has a MultiIndex with the levels: "id" and "sample"
@@ -352,7 +440,10 @@ class Dataset:
             for name, group in values.groupby("sample"):
                 group = group.droplevel(level="sample")
                 sample_values = self.samples_dict[name].values[molecule]
-                if not allow_foreign_ids and not group.index.isin(sample_values.index).all():
+                if (
+                    not skip_foreign_ids
+                    and not group.index.isin(sample_values.index).all()
+                ):
                     raise KeyError(
                         "Some of the provided values have ids that do not exist for this molecule."
                         " If you want to ignore those set the allow_foreign_ids attribute."
@@ -388,10 +479,14 @@ class Dataset:
             else:
                 res.loc[:, name] = self.missing_value
         if molecule_columns:
-            res.loc[:, molecule_columns] = self.molecules[molecule].loc[:, molecule_columns]
+            res.loc[:, molecule_columns] = self.molecules[molecule].loc[
+                :, molecule_columns
+            ]
         return res
 
-    def set_samples_value_matrix(self, matrix: pd.DataFrame, molecule: str, column: str = "abundance"):
+    def set_samples_value_matrix(
+        self, matrix: pd.DataFrame, molecule: str, column: str = "abundance"
+    ):
         for name, sample in self.samples_dict.items():
             if name in matrix.keys():
                 sample.values[molecule][column] = matrix[name]
@@ -408,19 +503,106 @@ class Dataset:
             del sample.values[molecule]
         self.molecule_set.rename_molecule(molecule=molecule, new_name=new_name)
 
-    def rename_columns(self, columns: Dict[str, Dict[str, str]], inplace: bool = False)->Optional['Dataset']:
+    def rename_mapping(self, mapping: str, new_name: str):
+        self.molecule_set.rename_mapping(mapping=mapping, new_name=new_name)
+
+    def rename_columns(
+        self, columns: Dict[str, Dict[str, str]], inplace: bool = False
+    ) -> Optional["Dataset"]:
         return rename_columns(dataset=self, columns=columns, inplace=inplace)
 
-    def rename_values(self, columns: Dict[str, str], molecules: Optional[List[str]] = None, inplace: bool = False):
-        return rename_values(data=self, columns=columns, molecules=molecules, inplace=inplace)
+    def rename_values(
+        self,
+        columns: Dict[str, str],
+        molecules: Optional[List[str]] = None,
+        inplace: bool = False,
+    ):
+        return rename_values(
+            data=self, columns=columns, molecules=molecules, inplace=inplace
+        )
 
-    def drop_values(self, columns: List[str], molecules: Optional[List[str]] = None, inplace: bool = False):
-        return drop_values(data=self, columns=columns, molecules=molecules, inplace=inplace)
+    def drop_values(
+        self,
+        columns: List[str],
+        molecules: Optional[List[str]] = None,
+        inplace: bool = False,
+    ):
+        return drop_values(
+            data=self, columns=columns, molecules=molecules, inplace=inplace
+        )
 
-    def create_graph(self, mapping: str = "gene", bidirectional: bool = True, cache: bool = True):
-        return self.molecule_set.create_graph(mapping=mapping, bidirectional=bidirectional, cache=cache)
+    def to_dgl_graph(
+        self,
+        molecule_features: Dict[str, Union[str, List[str]]],
+        mappings: Union[str, List[str]],
+        mapping_directions: Dict[str, Tuple[str, str]] = {},
+        make_bidirectional: bool = False,
+        features_to_float32: bool = True,
+        cache: bool = True,
+        update_cache: bool = False,
+    ) -> "dgl.DGLHeteroGraph":
+        import dgl
+        import torch
 
-    def calculate_hist(self, molecule_name: str, bins="auto") -> Tuple[np.ndarray, np.ndarray]:
+        if cache and self._dgl_graph is not None and not update_cache:
+            return self._dgl_graph
+        graph_data = dict()
+        if isinstance(mappings, str):
+            mappings = [mappings]
+        for mapping_name in mappings:
+            mapping = self.mappings[mapping_name]
+            if mapping_name in mapping_directions:
+                if tuple(mapping_directions[mapping_name]) != mapping.mapping_molecules:
+                    mapping = mapping.swaplevel()
+            if not make_bidirectional:
+                edge_mappings = [mapping]
+            else:
+                edge_mappings = [mapping, mapping.swaplevel()]
+            for mapping in edge_mappings:
+                identifier = (
+                    mapping.mapping_molecules[0],
+                    mapping_name,
+                    mapping.mapping_molecules[1],
+                )
+                edges = []
+                for i, mol in enumerate(mapping.mapping_molecules):
+                    e_data = self.molecules[mol].index.get_indexer(
+                        mapping.df.index.get_level_values(i)
+                    )
+                    edges.append(torch.from_numpy(e_data))
+                edges = tuple(edges)
+                graph_data[identifier] = edges
+        g = dgl.heterograph(graph_data)
+        for mol, mol_features in molecule_features.items():
+            if isinstance(mol_features, str):
+                mol_features = [mol_features]
+            mol_ids = self.molecules[mol].index
+            for feature in mol_features:
+                if feature in {"hidden", "mask"}:
+                    raise KeyError(
+                        'Feature names "hidden" and "mask" are reserved names'
+                    )
+                mat = self.get_samples_value_matrix(molecule=mol, column=feature).loc[
+                    mol_ids
+                ]
+                feat = torch.from_numpy(mat.to_numpy())
+                if features_to_float32:
+                    feat = feat.to(torch.float32)
+                g.nodes[mol].data[feature] = feat
+        if cache or update_cache:
+            self._dgl_graph = g
+        return g
+
+    def create_graph(
+        self, mapping: str = "gene", bidirectional: bool = True, cache: bool = True
+    ):
+        return self.molecule_set.create_graph(
+            mapping=mapping, bidirectional=bidirectional, cache=cache
+        )
+
+    def calculate_hist(
+        self, molecule_name: str, bins="auto"
+    ) -> Tuple[np.ndarray, np.ndarray]:
         values, mask = self.all_values(molecule=molecule_name, return_missing_mask=True)
         existing = values[~mask]
         bin_edges = np.histogram_bin_edges(existing, bins=bins)
@@ -428,7 +610,12 @@ class Dataset:
         return hist
 
     def plot_correlation(
-        self, molecule: str, column_x: str, column_y: str, samples: Optional[List[str]] = None, ax=None
+        self,
+        molecule: str,
+        column_x: str,
+        column_y: str,
+        samples: Optional[List[str]] = None,
+        ax=None,
     ):
         if ax is None:
             fig, ax = plt.subplots()

@@ -204,10 +204,14 @@ class MoleculeSet:
         self,
         mapping_name: str,
         molecule: str = None,
-        molecule_columns: List[str] = [],
-        partner_columns: List[str] = [],
+        molecule_columns: Union[str, List[str]] = [],
+        partner_columns: Union[str, List[str]] = [],
         partner_molecule: str = None,
     ) -> MoleculeMapping:
+        if isinstance(molecule_columns, str):
+            molecule_columns = [molecule_columns]
+        if isinstance(partner_columns, str):
+            partner_columns = [partner_columns]
         if molecule is not None and molecule not in self.molecules:
             raise KeyError(f"Molecule type {molecule} does not exist!")
         mapping_name = self.infer_mapping_name(molecule=molecule, mapping_name=mapping_name)
@@ -234,11 +238,11 @@ class MoleculeSet:
                         + f" This does not match the molecules ({molecule, partner_molecule}) you specified."
                     )
         mol_vals = self.molecules[molecule].loc[mapping.df.index.get_level_values(0), molecule_columns]
-        for mc in mol_vals:
+        for mc in mol_vals.columns:
             mc = mol_vals[mc]
             mapping.df[mc.name] = mc.values
         mol_vals = self.molecules[partner_molecule].loc[mapping.df.index.get_level_values(1), partner_columns]
-        for mc in mol_vals:
+        for mc in mol_vals.columns:
             mc = mol_vals[mc]
             mapping.df[mc.name] = mc.values
         return mapping

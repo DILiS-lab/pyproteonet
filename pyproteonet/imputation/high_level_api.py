@@ -36,50 +36,52 @@ def impute_molecule(
         result_columns = [result_columns]
     if result_columns is None:
         result_columns = methods
-    methods = set(methods)
+    methods_set = set(methods)
     if len(methods) != len(result_columns):
         raise ValueError("Number of methods and result columns should be the same")
     method_fns = dict()
-    if 'mindet' in methods:
+    if 'mindet' in methods_set:
         from pyproteonet.imputation.simple import min_det_impute
         method_fns['mindet'] = partial(min_det_impute, percentile=mnar_percentile)
-    if 'minprob' in methods:
+    if 'minprob' in methods_set:
         from pyproteonet.imputation.r.impute_lcmd import impute_min_prob
         method_fns['minprob'] = partial(impute_min_prob, q=mnar_percentile / 100)
-    if 'mean' in methods:
+    if 'mean' in methods_set:
         from pyproteonet.imputation.simple import across_sample_aggregate
         method_fns['mean'] = partial(across_sample_aggregate, method="mean", all_missing_percentile=mnar_percentile)
-    if 'bpca' in methods:
+    if 'bpca' in methods_set:
         from pyproteonet.imputation.r.pca_methods import impute_pca_method
         method_fns['bpca'] = partial(impute_pca_method, method="bpca")
-    if 'bpca_t' in methods:
+    if 'bpca_t' in methods_set:
+        from pyproteonet.imputation.r.pca_methods import impute_pca_method
         method_fns['bpca_t'] = partial(impute_pca_method, method="bpca", molecules_as_variables=True)
-    if 'ppca' in methods:
+    if 'ppca' in methods_set:
         from pyproteonet.imputation.r.pca_methods import impute_pca_method
         method_fns['ppca'] = partial(impute_pca_method, method="ppca")
-    if 'missforest' in methods:
+    if 'missforest' in methods_set:
         #We use a Python implementation of missForest, because it is faster than the R implementation for this senario
         from pyproteonet.imputation.random_forrest import missing_forrest_impute
         method_fns['missforest'] = partial(missing_forrest_impute, molecules_as_variables=False)
-    if 'missforest_t' in methods:
+    if 'missforest_t' in methods_set:
         from pyproteonet.imputation.r.miss_forest import impute_miss_forest
         method_fns['missforest_t'] = partial(impute_miss_forest, molecules_as_variables=True)
-    if 'knn' in methods:
+    if 'knn' in methods_set:
         from pyproteonet.imputation.sklearn import knn_impute
         method_fns['knn'] = partial(knn_impute, n_neighbors=knn_k)
-    if 'isvd' in methods:
+    if 'isvd' in methods_set:
         from pyproteonet.imputation.fancyimpute import iterative_svd_impute
         method_fns['isvd'] = partial(iterative_svd_impute, rank=0.2)
-    if 'iterative' in methods:
+    if 'iterative' in methods_set:
         from pyproteonet.imputation.sklearn import iterative_impute
         method_fns['iterative'] = iterative_impute
-    if 'dae' in methods:
+    if 'dae' in methods_set:
         from pyproteonet.imputation.dnn.autoencoder import impute_auto_encoder
         method_fns['dae'] = partial(impute_auto_encoder, validation_fraction=0.1, model_type='DAE')
-    if 'vae' in methods:
+    if 'vae' in methods_set:
         from pyproteonet.imputation.dnn.autoencoder import impute_auto_encoder
         method_fns['vae'] = partial(impute_auto_encoder, validation_fraction=0.1, model_type='VAE')
     for m, rc in tqdm(zip(methods, result_columns), total=len(methods)):
+        print(m, rc)
         dataset.values[molecule][rc] = method_fns[m](
             dataset=dataset, molecule=molecule, column=column
         )

@@ -137,10 +137,10 @@ def impute_all_sample_gnn(
     num_samples = len(in_dataset.sample_names)
     # heads = [num_samples, num_samples]  # [num_samples]
     # dimensions = [8 * num_smples, 4*num_samples, 2*num_samples]
-    #heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
-    heads = [8 * num_samples]
-    dimensions = [8]
-    #dimensions = [8, 8, 4] # [1]#, num_samples, num_samples]
+    heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
+    #heads = [8 * num_samples]
+    #dimensions = [8]
+    dimensions = [8, 8, 4] # [1]#, num_samples, num_samples]
     print(heads)
     print(dimensions)
     # module = GatNodeImputer(in_dim = num_samples + 2,
@@ -162,7 +162,7 @@ def impute_all_sample_gnn(
             2 * num_samples
         ],  # [8 * num_samples, 2 * num_samples]
         dropout=0.2,
-        lr=0.0005,
+        lr=0.001,
     )
 
     if logger is None:

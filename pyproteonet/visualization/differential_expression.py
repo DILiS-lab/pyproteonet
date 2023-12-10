@@ -30,8 +30,8 @@ def plot_des_volcano(
         dataset=dataset,
         molecule=molecule,
         columns=columns,
-        group1_samples=numerator_samples,
-        group2_samples=denominator_samples,
+        nominator_samples=numerator_samples,
+        denominator_samples=denominator_samples,
         is_log = is_log
     )
     if ids is not None:

@@ -297,7 +297,7 @@ def train_eval_full_protein_and_mapped(
             dataset=dataset,
             masks={
                 molecule: eval_protein_mask,
-                # peptide_molecule: eval_peptide_mask,
+                peptide_molecule: eval_peptide_mask,
             },
         )
     else:
