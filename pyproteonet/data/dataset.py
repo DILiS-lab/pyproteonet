@@ -18,7 +18,6 @@ from .dataset_sample import DatasetSample
 from ..utils.numpy import eq_nan
 from ..utils.pandas import matrix_to_multiindex
 from ..processing.dataset_transforms import rename_values, drop_values, rename_columns
-from ..io.io import read_mapped_dataframe
 
 
 class DatasetMoleculeValues:
@@ -101,6 +100,7 @@ class Dataset:
         mapping_molecule: str = "protein",
         mapping_name="peptide-protein",
     ) -> "Dataset":
+        from ..io.io import read_mapped_dataframe
         return read_mapped_dataframe(
             df=df,
             molecule=molecule,

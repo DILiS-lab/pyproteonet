@@ -37,7 +37,7 @@ def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]],
 #TODO: add docstrings
 def evaluate_des(dataset: Dataset, molecule: str, columns: Union[str, List[str]], numerator_samples: List[str], 
                  denominator_samples: List[str], gt_fc: pd.Series, min_fc: float = 1.5, max_pvalue: float = 0.05,
-                 is_log: bool = False)->pd.DataFrame:
+                 is_log: bool = False, absolute_metrics: bool = False)->pd.DataFrame:
     des, pvalues, fc = find_des(dataset=dataset, molecule=molecule, columns=columns,
                                 nominator_samples=numerator_samples, denominator_samples=denominator_samples,
                                 min_fc=min_fc, max_pvalue=max_pvalue, is_log=is_log)
@@ -47,9 +47,15 @@ def evaluate_des(dataset: Dataset, molecule: str, columns: Union[str, List[str]]
     correct_lower = (gt_fc < 1/min_fc) & (fc < min_fc)
     correctly_found = des & (correct_higher | correct_lower) & gt_de
     correctly_not_found = (~des) & (~gt_de)
-    prec_rec_eval = pd.DataFrame({'Recall':correctly_found.sum() / gt_de.sum()})
-    prec_rec_eval['Precision'] = correctly_found.sum() / des.sum()
-    prec_rec_eval['Specificity'] = correctly_not_found.sum() / (~des).sum()
-    prec_rec_eval['Accuracy'] = (gt_de == des).sum() / gt_de.count()
-    prec_rec_eval['FP Rate'] = (des & (gt_de)).sum() / (~gt_de).sum()
+    if absolute_metrics:
+        prec_rec_eval = pd.DataFrame({'Correct DE':correctly_found.sum()})
+        prec_rec_eval['Correct no DE'] = correctly_not_found.sum() 
+        prec_rec_eval['Correctly Classified'] = (gt_de == des).sum() 
+        prec_rec_eval['False Positives'] = (des & (gt_de)).sum()
+    else:
+        prec_rec_eval = pd.DataFrame({'Recall':correctly_found.sum() / gt_de.sum()})
+        prec_rec_eval['Precision'] = correctly_found.sum() / des.sum()
+        prec_rec_eval['Specificity'] = correctly_not_found.sum() / (~des).sum()
+        prec_rec_eval['Accuracy'] = (gt_de == des).sum() / gt_de.count()
+        prec_rec_eval['FP Rate'] = (des & (gt_de)).sum() / (~gt_de).sum()
     return prec_rec_eval

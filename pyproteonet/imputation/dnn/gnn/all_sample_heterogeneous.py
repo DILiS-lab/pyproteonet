@@ -11,15 +11,16 @@ from dgl.nn.pytorch.conv import GATConv, GATv2Conv
 from dgl.nn.pytorch import HeteroGraphConv
 from dgl.nn.pytorch.utils import Sequential as DglSequential
 from dgl.dataloading import GraphCollator
+import dgl
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
-from ...data.dataset import Dataset
-from ...masking.masked_dataset_generator import MaskedDatasetGenerator
-from ...masking.random import mask_molecule_values_random_non_missing
-from ...lightning.console_logger import ConsoleLogger
-from ...normalization.dnn_normalizer import DnnNormalizer
-from ...masking.missing_values import mask_missing
-from ...data.masked_dataset import MaskedDataset
+from ....data.dataset import Dataset
+from ....masking.masked_dataset_generator import MaskedDatasetGenerator
+from ....masking.random import mask_molecule_values_random_non_missing
+from ....lightning.console_logger import ConsoleLogger
+from ....normalization.dnn_normalizer import DnnNormalizer
+from ....masking.missing_values import mask_missing
+from ....data.masked_dataset import MaskedDataset
 
 
 class ImputationModuleBackup(L.LightningModule):
@@ -50,7 +51,7 @@ class ImputationModuleBackup(L.LightningModule):
         self.partner_fc_model = nn.Sequential(*dense_layers)
         partner_fc_out_dim = 2 * in_dim
         self.molecule_gat = GATv2Conv(
-            in_feats=(partner_fc_out_dim, in_dim),
+            in_feats=(partner_fc_out_dim, in_dim + embedding_dim),
             out_feats=2 * in_dim,
             num_heads=gat_heads,
             feat_drop=dropout,
@@ -143,7 +144,9 @@ class ImputationModule(L.LightningModule):
         dropout=0.2,
         gat_heads=10,
         gat_dim=64,
-        mask_value=-10,
+        mask_value=-2,
+        num_embeddings: Optional[int] = None,
+        embedding_dim: Optional[int] = 64,
     ):
         super().__init__()
         self.molecule = molecule
@@ -153,20 +156,28 @@ class ImputationModule(L.LightningModule):
         self.partner_loss_coefficent = partner_loss_coefficent
         self.etype = (partner_molecule, mapping, molecule)
         self.etype_inverse = (molecule, mapping, partner_molecule)
-        dense_layers = []
-        last_dim = in_dim
-        for dim in layers:
-            dense_layers.append(nn.Linear(last_dim, dim))
-            dense_layers.append(nn.Dropout(p=dropout))
-            dense_layers.append(nn.LeakyReLU())
-            last_dim = dim
-        dense_layers.append(nn.Linear(last_dim, 2 * in_dim))
-        self.partner_fc_model = nn.Sequential(*dense_layers)
-        partner_fc_out_dim = 2 * in_dim
+        dense_layers_partner = []
+        dense_layers_molecule = []
+        fc_out_dim = 2 * in_dim
+        if num_embeddings is not None and embedding_dim is not None:
+            self.embedding = nn.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+        else:
+            self.embedding = None
+            embedding_dim = 0
+        for dense_layers, fc_in_dim in [(dense_layers_partner, in_dim), (dense_layers_molecule, in_dim + embedding_dim)]:
+            last_dim = fc_in_dim
+            for dim in layers:
+                dense_layers.append(nn.Linear(last_dim, dim))
+                dense_layers.append(nn.Dropout(p=dropout))
+                dense_layers.append(nn.LeakyReLU())
+                last_dim = dim
+            dense_layers.append(nn.Linear(last_dim, 2 * in_dim))
+        self.molecule_fc_model = nn.Sequential(*dense_layers_molecule)
+        self.partner_fc_model = nn.Sequential(*dense_layers_partner)
         self.molecule_gat = HeteroGraphConv(
             {
                 self.etype: GATv2Conv(
-                    in_feats=(partner_fc_out_dim, in_dim),
+                    in_feats=(fc_out_dim, fc_out_dim),
                     out_feats=gat_dim,
                     num_heads=gat_heads,
                     feat_drop=dropout,
@@ -177,7 +188,7 @@ class ImputationModule(L.LightningModule):
         self.partner_gat = HeteroGraphConv(
             {
                 self.etype_inverse: GATv2Conv(
-                    in_feats=(gat_dim, partner_fc_out_dim),
+                    in_feats=(gat_dim, fc_out_dim),
                     out_feats=gat_dim,
                     num_heads=gat_heads,
                     feat_drop=dropout,
@@ -197,8 +208,8 @@ class ImputationModule(L.LightningModule):
                 )
             }
         )
-        self.molecule_linear = nn.Linear(gat_dim, 2 * in_dim)
-        self.partner_linear = nn.Linear(gat_dim, 2 * in_dim)
+        self.molecule_linear = nn.Linear(gat_dim + fc_out_dim, 2 * in_dim)
+        self.partner_linear = nn.Linear(gat_dim + fc_out_dim, 2 * in_dim)
         self.loss_fn = torch.nn.GaussianNLLLoss()
         self.lr = lr
         self.mask_value = mask_value
@@ -216,23 +227,28 @@ class ImputationModule(L.LightningModule):
             ab[torch.isnan(ab)] = self.mask_value
         partner_inputs = abundance[self.partner_molecule]
         molecule_inputs = abundance[self.molecule]
-        partner_vec = self.partner_fc_model(partner_inputs)
+        if self.embedding is not None:
+            molecule_inputs = torch.cat((self.embedding(graph.nodes(self.molecule).int()), molecule_inputs), dim=-1)
+        partner_fc_vec = self.partner_fc_model(partner_inputs)
+        molecule_fc_vec = self.molecule_fc_model(molecule_inputs)
         mol_vec = nn.functional.leaky_relu(
-            self.molecule_gat(graph, ({self.partner_molecule:partner_vec}, {self.molecule:molecule_inputs}))[self.molecule].mean(dim=-2)
+            self.molecule_gat(graph, ({self.partner_molecule:partner_fc_vec}, {self.molecule:molecule_fc_vec}))[self.molecule].mean(dim=-2)
         )
         partner_vec = nn.functional.leaky_relu(
-            self.partner_gat(graph, ({self.molecule:mol_vec}, {self.partner_molecule:partner_vec}))[self.partner_molecule].mean(dim=-2)
+            self.partner_gat(graph, ({self.molecule:mol_vec}, {self.partner_molecule:partner_fc_vec}))[self.partner_molecule].mean(dim=-2)
         )
         mol_vec = nn.functional.leaky_relu(
             self.molecule_gat2(graph, ({self.partner_molecule:partner_vec}, {self.molecule:mol_vec}))[self.molecule].mean(dim=-2)
         )
         # output = output.view(output.shape[0], -1)
         # reshape molecule vector
+        mol_vec = torch.cat((mol_vec, molecule_fc_vec), dim=-1)
         mol_vec = self.molecule_linear(mol_vec)
         mol_shape = list(mol_vec.shape)
         mol_shape[-1] = int(mol_shape[-1] / 2)
         mol_vec = mol_vec.reshape(*mol_shape, 2)
         # reshape partner vector
+        partner_vec = torch.cat((partner_vec, partner_fc_vec), dim=-1)
         partner_vec = self.partner_linear(partner_vec)
         partner_shape = list(partner_vec.shape)
         partner_shape[-1] = int(partner_shape[-1] / 2)
@@ -251,7 +267,8 @@ class ImputationModule(L.LightningModule):
 
         partner_mask = masks[self.partner_molecule]
         partner_gt = abundance[self.partner_molecule].detach().clone()
-        assert torch.isnan(partner_gt[partner_mask]).sum() == 0
+        #assert torch.isnan(partner_gt[partner_mask]).sum() == 0
+        partner_gt[torch.isnan(partner_gt)] = self.mask_value
         partner_input = abundance[self.partner_molecule]
         partner_input[partner_mask] = self.mask_value
         partner_target = partner_gt[partner_mask]
@@ -264,9 +281,11 @@ class ImputationModule(L.LightningModule):
         # loss = torch.nn.functional.mse_loss(output, inputs.mean(dim=-1, keepdim=True))
         loss = self.molecule_loss_coefficent * self.loss_fn(
             mol_pred, target=mol_target, var=mol_var
-        ) + self.partner_loss_coefficent * self.loss_fn(
-            partner_pred, target=partner_target, var=partner_var
-        )
+        ) 
+        if self.partner_loss_coefficent > 0:
+            loss += self.partner_loss_coefficent * self.loss_fn(
+                partner_pred, target=partner_target, var=partner_var
+            )
         return loss
 
     def training_step(self, graph, batch_idx):
@@ -314,9 +333,11 @@ def impute_gnn(
     molecule_uncertainty_column: Optional[str] = None,
     partner_result_column: Optional[str] = None,
     partner_uncertainty_column: Optional[str] = None,
-    molecule_coefficient=1,
-    partner_coefficient=1,
+    molecule_coefficient: Optional[float]=None,
+    partner_coefficient: Optional[float]=None,
     max_epochs: int = 5000,
+    molecule_masking_fraction: float = 0.1,
+    embedding_dim: Optional[int] = None
 ) -> pd.Series:
     molecule, mapping, partner_molecule = dataset.infer_mapping(
         molecule=molecule, mapping=mapping
@@ -364,17 +385,20 @@ def impute_gnn(
         dataset=ds,
         mask_ids={molecule: validation_ids, partner_molecule: partner_validation_ids},
     )
-
+    mapping_df = ds.mappings[mapping].df
     def masking_fn(in_ds):
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
         molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()]
         molecule_mask_ids = (
-            molecule_mask_ids[~molecule_mask_ids.index.isin(validation_ids)]
-            .sample(frac=0.1)
+            molecule_mask_ids#[~molecule_mask_ids.index.isin(validation_ids)]
+            .sample(frac=molecule_masking_fraction)
             .index
         )
+        molecules = molecule_mask_ids.get_level_values('id').unique()
+        partner_molecules = mapping_df[mapping_df.index.get_level_values(molecule).isin(molecules)].index.get_level_values(partner_molecule).unique()
         partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
-        partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
+        partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(partner_molecules)]
+        #partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
         partner_mask_ids = (
             partner_mask_ids[~partner_mask_ids.index.isin(partner_validation_ids)]
             .sample(frac=masking_fraction)
@@ -383,7 +407,7 @@ def impute_gnn(
         return MaskedDataset.from_ids(
             dataset=in_ds,
             mask_ids={molecule: molecule_mask_ids, partner_molecule: partner_mask_ids},
-            hidden_ids={molecule: validation_ids},
+            #hidden_ids={molecule: validation_ids, partner_molecule: partner_validation_ids},
         )
 
     mask_ds = MaskedDatasetGenerator(datasets=[ds], generator_fn=masking_fn)
@@ -407,8 +431,15 @@ def impute_gnn(
         return collator.collate(res)
 
     train_dl = DataLoader(mask_ds, batch_size=1, collate_fn=collate)
+    graph = list(train_dl)[0]
+    num_embeddings = int(graph.num_nodes(ntype=molecule))
     validation_dl = DataLoader([validation_set], batch_size=1, collate_fn=collate)
 
+    if molecule_coefficient is None:
+        molecule_coefficient = 1
+    if partner_coefficient is None:
+        partner_coefficient = (ds.molecules[molecule].shape[0] * molecule_masking_fraction) / (ds.molecules[partner_molecule].shape[0] * masking_fraction)
+    print(f"molecule_coefficient: {molecule_coefficient}, partner_coefficient: {partner_coefficient}")
     in_dim = dataset.num_samples
     model = ImputationModule(
         molecule=molecule,
@@ -421,7 +452,9 @@ def impute_gnn(
         molecule_loss_coefficent=molecule_coefficient,
         partner_loss_coefficent=partner_coefficient,
         dropout=0.1,
-        lr=0.001,
+        lr=0.01,
+        num_embeddings=num_embeddings,
+        embedding_dim=embedding_dim,
     )
 
     trainer = L.Trainer(
@@ -430,7 +463,7 @@ def impute_gnn(
         check_val_every_n_epoch=10,
         max_epochs=max_epochs,
         enable_checkpointing=False,
-        callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=3)],
+        callbacks=[EarlyStopping(monitor="train_loss", mode="min", patience=5)],
     )
     trainer.fit(model=model, train_dataloaders=train_dl, val_dataloaders=validation_dl)
 
