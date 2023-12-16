@@ -1,1 +1,2 @@
-from .all_sample_homogeneous import impute_all_sample_homogeneous_gnn
+from .homogeneous import impute_homogeneous_gnn
+from .heterogeneous import impute_heterogeneous_gnn

@@ -2,6 +2,7 @@ from typing import Any, Dict, Tuple, Callable, List, Iterable, Optional, Union
 from collections import OrderedDict
 import glob
 import shutil
+import copy
 
 import numpy as np
 import pandas as pd
@@ -487,9 +488,9 @@ class Dataset:
     def set_samples_value_matrix(
         self, matrix: pd.DataFrame, molecule: str, column: str = "abundance"
     ):
-        for name, sample in self.samples_dict.items():
-            if name in matrix.keys():
-                sample.values[molecule][column] = matrix[name]
+        for sample_name, sample in self.samples_dict.items():
+            if sample_name in matrix.keys():
+                sample.values[molecule][column] = matrix[sample_name]
 
     def rename_molecule(self, molecule: str, new_name: str):
         if new_name in self.values:
@@ -533,64 +534,86 @@ class Dataset:
 
     def to_dgl_graph(
         self,
-        molecule_features: Dict[str, Union[str, List[str]]],
+        feature_columns: Dict[str, Union[str, List[str]]],
         mappings: Union[str, List[str]],
         mapping_directions: Dict[str, Tuple[str, str]] = {},
         make_bidirectional: bool = False,
         features_to_float32: bool = True,
         cache: bool = True,
         update_cache: bool = False,
+        samples: Optional[List[str]] = None,
     ) -> "dgl.DGLHeteroGraph":
         import dgl
         import torch
-
-        if cache and self._dgl_graph is not None and not update_cache:
-            return self._dgl_graph
-        graph_data = dict()
-        if isinstance(mappings, str):
-            mappings = [mappings]
-        for mapping_name in mappings:
-            mapping = self.mappings[mapping_name]
-            if mapping_name in mapping_directions:
-                if tuple(mapping_directions[mapping_name]) != mapping.mapping_molecules:
-                    mapping = mapping.swaplevel()
-            if not make_bidirectional:
-                edge_mappings = [mapping]
-            else:
-                edge_mappings = [mapping, mapping.swaplevel()]
-            for mapping in edge_mappings:
-                identifier = (
-                    mapping.mapping_molecules[0],
-                    mapping_name,
-                    mapping.mapping_molecules[1],
-                )
-                edges = []
-                for i, mol in enumerate(mapping.mapping_molecules):
-                    e_data = self.molecules[mol].index.get_indexer(
-                        mapping.df.index.get_level_values(i)
+        graph_params = {
+            'feature_columns': feature_columns,
+            'mappings': mappings,
+            'mapping_directions': mapping_directions,
+            'make_bidirectional': make_bidirectional,
+            'features_to_float32': features_to_float32,
+            'samples': samples
+        }
+        if samples is None:
+            samples = self.sample_names
+        if cache and self._dgl_graph is not None and not update_cache and self._dgl_graph_params == graph_params:
+            g = self._dgl_graph
+        else:
+            graph_data = dict()
+            if isinstance(mappings, str):
+                mappings = [mappings]
+            for mapping_name in mappings:
+                mapping = self.mappings[mapping_name]
+                if mapping_name in mapping_directions:
+                    if tuple(mapping_directions[mapping_name]) != mapping.mapping_molecules:
+                        mapping = mapping.swaplevel()
+                if not make_bidirectional:
+                    edge_mappings = [mapping]
+                else:
+                    edge_mappings = [mapping, mapping.swaplevel()]
+                for mapping in edge_mappings:
+                    identifier = (
+                        mapping.mapping_molecules[0],
+                        mapping_name,
+                        mapping.mapping_molecules[1],
                     )
-                    edges.append(torch.from_numpy(e_data))
-                edges = tuple(edges)
-                graph_data[identifier] = edges
-        g = dgl.heterograph(graph_data)
-        for mol, mol_features in molecule_features.items():
-            if isinstance(mol_features, str):
-                mol_features = [mol_features]
-            mol_ids = self.molecules[mol].index
-            for feature in mol_features:
-                if feature in {"hidden", "mask"}:
-                    raise KeyError(
-                        'Feature names "hidden" and "mask" are reserved names'
-                    )
-                mat = self.get_samples_value_matrix(molecule=mol, column=feature).loc[
-                    mol_ids
-                ]
-                feat = torch.from_numpy(mat.to_numpy())
-                if features_to_float32:
-                    feat = feat.to(torch.float32)
-                g.nodes[mol].data[feature] = feat
-        if cache or update_cache:
-            self._dgl_graph = g
+                    edges = []
+                    for i, mol in enumerate(mapping.mapping_molecules):
+                        e_data = self.molecules[mol].index.get_indexer(
+                            mapping.df.index.get_level_values(i)
+                        )
+                        edges.append(torch.from_numpy(e_data))
+                    edges = tuple(edges)
+                    graph_data[identifier] = edges
+            g = dgl.heterograph(graph_data)
+            for mol, mol_features in feature_columns.items():
+                if isinstance(mol_features, str):
+                    mol_features = [mol_features]
+                mol_ids = self.molecules[mol].index
+                for feature in mol_features:
+                    if feature in {"hidden", "mask"}:
+                        raise KeyError(
+                            'Feature names "hidden" and "mask" are reserved names'
+                        )
+                    mat = self.get_samples_value_matrix(molecule=mol, column=feature).loc[
+                        mol_ids, samples
+                    ]
+                    feat = torch.from_numpy(mat.to_numpy())
+                    if features_to_float32:
+                        feat = feat.to(torch.float32)
+                    g.nodes[mol].data[feature] = feat
+            if cache or update_cache:
+                self._dgl_graph = g
+                self._dgl_graph_params = graph_params
+        # if samples is None:
+        #     res = g
+        # else:
+        #     res = copy.deepcopy(g)
+        #     sample_ids = {sample: i for i, sample in enumerate(self.sample_names)}
+        #     ids = torch.tensor([sample_ids[sample] for sample in samples])
+        #     for mol, mol_features in feature_columns.items():
+        #         for feature in mol_features:
+        #             sample_mat = res.nodes[mol].data[feature][:, ids]
+        #             res.nodes[mol].data[feature] = sample_mat
         return g
 
     def create_graph(

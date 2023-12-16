@@ -205,7 +205,7 @@ def impute_all_sample_gnn(
 
     predict_ds = mask_missing(dataset=in_dataset, molecule=molecule, column="abundance")
     predict_graph = predict_ds.to_dgl_graph(
-        molecule_features={
+        feature_columns={
             mol: ["abundance"] for mol in predict_ds.dataset.molecules.keys()
         },
         mappings=[mapping],

@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Tuple
 from typing import List
 
 import numpy as np
@@ -8,7 +8,6 @@ import dgl
 import torch
 import torch.nn as nn
 from dgl.nn.pytorch.conv import GATConv, GATv2Conv
-import torch.nn.functional as F
 
 from ....lightning.abstract_node_imputer import AbstractNodeImputer
 from ....data.dataset import Dataset
@@ -29,14 +28,14 @@ from ....masking.train_eval import (
     train_eval_full_protein_and_mapped,
     train_eval_full_protein_and_mapped_backup,
     train_eval_full_molecule,
-    train_eval_full_molecule_some_mapped
+    train_eval_full_molecule_some_mapped,
 )
 from ....dgl.collate import (
     masked_dataset_to_homogeneous_graph,
     masked_heterograph_to_homogeneous,
 )
-from ....lightning.uncertainty_gat_node_imputer import UncertaintyGatNodeImputer
 from ....masking.missing_values import mask_missing
+
 
 class UncertaintyGAT(torch.nn.Module):
     def __init__(
@@ -50,11 +49,15 @@ class UncertaintyGAT(torch.nn.Module):
         dropout: float = 0.0,
         num_embeddings: Optional[int] = None,
         embedding_dim: Optional[int] = None,
+        average_heads: bool = False,
     ):
         super().__init__()
         self.embedding = None
+        self.average_heads = average_heads
         if num_embeddings is not None and embedding_dim is not None:
-            self.embedding = nn.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+            self.embedding = nn.Embedding(
+                num_embeddings=num_embeddings, embedding_dim=embedding_dim
+            )
             in_dim = embedding_dim + in_dim
         if len(initial_dense_layers) > 0:
             dense_layers = []
@@ -79,19 +82,27 @@ class UncertaintyGAT(torch.nn.Module):
                 last_d = gat_dims[i - 1]
                 last_h = heads[i - 1]
             layers.append(
-                layer_type(in_feats=last_d * last_h, out_feats=d, num_heads=h, feat_drop=dropout, attn_drop=dropout)
+                layer_type(
+                    in_feats=last_d if self.average_heads else last_d * last_h,
+                    out_feats=d,
+                    num_heads=h,
+                    feat_drop=dropout,
+                    attn_drop=dropout,
+                )
             )
         self.gat_layers: List[layer_type] = nn.ModuleList(layers)
         self.out_layer = layer_type(
-            in_feats=gat_dims[-1] * heads[-1], out_feats=out_dim, num_heads=1
+            in_feats=gat_dims[-1] if self.average_heads else gat_dims[-1] * heads[-1], out_feats=out_dim, num_heads=1
         )
 
     def reshape_multihead_output(self, h):
-        h_concat = []
-        for h_idx in range(h.size()[1]):
-            h_concat.append(h[:, h_idx])
-        h = torch.cat(h_concat, axis=-1)
-        return h
+        if self.average_heads:
+            return h.mean(dim=-2)
+        else:
+            h_concat = []
+            for h_idx in range(h.size()[1]):
+                h_concat.append(h[:, h_idx])
+            return torch.cat(h_concat, axis=-1)
 
     def forward(self, graph, feat, eweight=None):
         # graph = dgl.to_homogeneous(graph, ndata = ['x'])
@@ -128,8 +139,9 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         dropout: float = 0.0,
         num_embeddings: Optional[int] = None,
         embedding_dim: Optional[int] = None,
+        average_heads: bool = False
     ):
-        print(out_dim)
+        #print(out_dim)
         super().__init__(
             nan_substitute_value=nan_substitute_value,
             mask_substitute_value=mask_substitute_value,
@@ -137,7 +149,7 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
             lr=lr,
         )
         self._out_dim = out_dim
-        print(num_embeddings, embedding_dim)
+        #print(num_embeddings, embedding_dim)
         self._model = UncertaintyGAT(
             in_dim=in_dim,
             heads=heads,
@@ -147,7 +159,8 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
             initial_dense_layers=initial_dense_layers,
             dropout=dropout,
             num_embeddings=num_embeddings,
-            embedding_dim=embedding_dim
+            embedding_dim=embedding_dim,
+            average_heads=average_heads,
         )
         self.uncertainty_loss = uncertainty_loss
 
@@ -173,8 +186,12 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         self.log(f"{prefix}_mse", mse, batch_size=batch_size)
         self.log(f"{prefix}_rmse", mse**0.5, batch_size=batch_size)
         self.log(f"{prefix}_mae", mae, batch_size=batch_size)
-        uncertainty_pearson = (torch.corrcoef(torch.t(torch.stack((y, uncertainty), -1)))[0, 1]).item()
-        self.log(f"{prefix}_uncertainty_pearson", uncertainty_pearson, batch_size=batch_size)
+        uncertainty_pearson = (
+            torch.corrcoef(torch.t(torch.stack((y, uncertainty), -1)))[0, 1]
+        ).item()
+        self.log(
+            f"{prefix}_uncertainty_pearson", uncertainty_pearson, batch_size=batch_size
+        )
 
     @property
     def model(self):
@@ -191,7 +208,9 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
 
     def calculate_loss(self, pred, target):
         if self.uncertainty_loss:
-            return F.gaussian_nll_loss(pred[:, 0], target=target, var=torch.exp(pred[:, 1]))
+            return F.gaussian_nll_loss(
+                pred[:, 0], target=target, var=torch.exp(pred[:, 1])
+            )
         else:
             return F.mse_loss(pred[:, 0], target)
 
@@ -199,38 +218,48 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         res = self(batch)
         return res
 
-def impute_all_sample_homogeneous_gnn(
+
+def impute_homogeneous_gnn(
     dataset: Dataset,
     molecule: str,
     mapping: str,
     column: str,
     partner_column: str,
-    validation_fraction=0.1,
     training_fraction=0.3,
-    partner_masking_fraction=0.5,
+    feature_columns:  Optional[List[str]] = None,
+    partner_feature_columns: Optional[List[str]] = None,
     result_column: Optional[str] = None,
+    partner_result_column: Optional[str] = None,
     max_epochs: int = 10000,
     validation_frequency: int = 10,
     early_stopping_patience: int = 5,
     missing_substitute_value: float = -3,
     use_gatv2: bool = True,
-    train_on_mapped: bool = True,
+    train_on_partner: bool = True,
     uncertainty_column: Optional[str] = None,
     logger: Optional[object] = None,
     log_every_n_steps: int = 10,
-    protein_gt_column: Optional[str] = None,
-    max_partner_mnar_quantile: float = 0.0,
     embedding_dim: Optional[int] = None,
+    train_sample_wise: bool = False,
+    molecule_gt_column: Optional[str] = None,
 ):
     molecule, mapping, partner_molecule = dataset.infer_mapping(
         molecule=molecule, mapping=mapping
     )
+    if feature_columns is None:
+        feature_columns = []
+    if partner_feature_columns is None:
+        partner_feature_columns = feature_columns
+    if len(feature_columns) != len(partner_feature_columns):
+        raise ValueError(
+            "The number of molecule and partner molecule feature columns must be the same to allow combining them into a homogeneous graph."
+        )
 
     in_dataset = dataset.copy(
         columns={
             molecule: [column]
-            if protein_gt_column is None
-            else [column, protein_gt_column],
+            if molecule_gt_column is None
+            else [column, molecule_gt_column],
             partner_molecule: [partner_column],
         }
     )
@@ -244,9 +273,9 @@ def impute_all_sample_homogeneous_gnn(
         molecules=[partner_molecule],
         inplace=True,
     )
-    if protein_gt_column is not None:
+    if molecule_gt_column is not None:
         in_dataset.rename_values(
-            columns={protein_gt_column: "abundance_gt"},
+            columns={molecule_gt_column: "abundance_gt"},
             molecules=[molecule],
             inplace=True,
         )
@@ -258,29 +287,16 @@ def impute_all_sample_homogeneous_gnn(
         mask = ~non_missing.isna()
         gt[mask] = non_missing[mask]
         in_dataset.values[molecule]["abundance_gt"] = gt
-    normalizer = DnnNormalizer(columns=["abundance", "abundance_gt"], logarithmize=False)
+        in_dataset.values[partner_molecule]["abundance_gt"] = in_dataset.values[partner_molecule]["abundance"]
+    for i, col in enumerate(feature_columns):
+        in_dataset.values[molecule][f'f{i}'] = dataset.values[molecule][col]
+    for i, col in enumerate(partner_feature_columns):
+        in_dataset.values[partner_molecule][f'f{i}'] = dataset.values[partner_molecule][col]
+    feature_names = [f"f{i}" for i in range(len(feature_columns))]
+    normalizer = DnnNormalizer(
+        columns=["abundance", "abundance_gt"] + feature_names, logarithmize=False
+    )
     normalizer.normalize(dataset=in_dataset, inplace=True)
-
-    # train_ds, eval_ds = train_eval_full_molecule_some_mapped(
-    #     dataset=in_dataset,
-    #     molecule=molecule,
-    #     column="abundance",
-    #     partner_column="abundance",
-    #     mapping=mapping,
-    #     validation_fraction=validation_fraction,
-    #     training_fraction=training_fraction,
-    #     partner_hide_fraction=partner_masking_fraction,
-    # )
-    # train_ds, eval_ds = train_eval_full_protein_and_mapped(
-    #     dataset=in_dataset,
-    #     molecule=molecule,
-    #     column="abundance",
-    #     partner_column="abundance",
-    #     mapping=mapping,
-    #     validation_fraction=validation_fraction,
-    #     training_fraction=training_fraction,
-    #     partner_masking_fraction=partner_masking_fraction,
-    # )
 
     # determining the masking fraction to resemble the missing fraction of partner molecule in the dataset
     missing_mols = dataset.values[molecule][column]
@@ -302,100 +318,148 @@ def impute_all_sample_homogeneous_gnn(
         mapped_non_missing.isna().sum() / mapped_non_missing.shape[0]
     ).item()
     masking_fraction = missing_fraction - non_missing_fraction
+
     validation_ids = in_dataset.values[molecule]["abundance"]
-    validation_ids = validation_ids[~validation_ids.isna()].sample(frac=0.1).index
-    partner_validation_ids = in_dataset.values[partner_molecule]["abundance"]
-    partner_validation_ids = (
-        partner_validation_ids[~partner_validation_ids.isna()].sample(frac=0.1).index
-    )
+    validation_ids = validation_ids[~validation_ids.isna()].sample(frac=0.2).index
+    # partner_validation_ids = in_dataset.values[partner_molecule]["abundance"]
+    # partner_validation_ids = (
+    #     partner_validation_ids[~partner_validation_ids.isna()].sample(frac=0.1).index
+    # )
     validation_set = MaskedDataset.from_ids(
         dataset=in_dataset,
-        mask_ids={molecule: validation_ids, partner_molecule: partner_validation_ids},
+        mask_ids={
+            molecule: validation_ids
+        },  # , partner_molecule: partner_validation_ids},
     )
+    if train_sample_wise:
+        validation_set = [(validation_set, [s]) for s in in_dataset.sample_names]
+    else:
+        validation_set = [(validation_set, None)]
+
+    mapping_df = dataset.mappings[mapping].df
 
     def masking_fn(in_ds):
+        mask_ids = {}
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
         molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()]
         molecule_mask_ids = (
             molecule_mask_ids[~molecule_mask_ids.index.isin(validation_ids)]
-            .sample(frac=0.1)
+            .sample(frac=training_fraction)
             .index
         )
-        partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
-        partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
-        partner_mask_ids = (
-            partner_mask_ids[~partner_mask_ids.index.isin(partner_validation_ids)]
-            .sample(frac=masking_fraction)
-            .index
-        )
+        mask_ids[molecule] = molecule_mask_ids
+        if train_on_partner:
+            molecules = molecule_mask_ids.get_level_values("id").unique()
+            partner_molecules = (
+                mapping_df[mapping_df.index.get_level_values(molecule).isin(molecules)]
+                .index.get_level_values(partner_molecule)
+                .unique()
+            )
+            partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
+            partner_mask_ids = partner_mask_ids[
+                partner_mask_ids.index.get_level_values("id").isin(partner_molecules)
+            ]
+            partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
+            partner_mask_ids = partner_mask_ids.sample(  # [~partner_mask_ids.index.isin(partner_validation_ids)]
+                frac=masking_fraction
+            ).index
+            mask_ids[partner_molecule] = partner_mask_ids
         return MaskedDataset.from_ids(
             dataset=in_ds,
-            mask_ids={molecule: molecule_mask_ids, partner_molecule: partner_mask_ids},
-            hidden_ids={molecule: validation_ids},
+            mask_ids=mask_ids,
+            hidden_ids={
+                molecule: validation_ids
+            },  # , partner_molecule: partner_validation_ids},
         )
-    mask_ds = MaskedDatasetGenerator(datasets=[in_dataset], generator_fn=masking_fn)
 
-
+    mask_ds = MaskedDatasetGenerator(datasets=[in_dataset], generator_fn=masking_fn, sample_wise=train_sample_wise)
 
     collator = GraphCollator()
-    collate_fn = lambda masked_datasets: collator.collate(
-        masked_dataset_to_homogeneous_graph(
-            masked_datasets=masked_datasets,
-            mappings=[mapping],
-            target="abundance",
-            features=[],
+
+    def collate_fn(masked_ds_samples: Tuple[MaskedDataset, List[str]]):
+        masked_datasets = []
+        samples_lists = []
+        for masked_ds, samples in masked_ds_samples:
+            masked_datasets.append(masked_ds)
+            samples_lists.append(samples)
+        return collator.collate(
+            masked_dataset_to_homogeneous_graph(
+                masked_datasets=masked_datasets,
+                mappings=[mapping],
+                target="abundance",
+                features=feature_names,
+                sample_lists=samples_lists,
+            )
         )
-    )
-    train_dl = DataLoader(mask_ds, batch_size=1, collate_fn=collate_fn)
-    graph = list(train_dl)[0]
-    num_embeddings = int(graph.ndata[dgl.NID].max().item() + 1)
-    eval_dl = DataLoader([validation_set], batch_size=1, collate_fn=collate_fn)
-    early_stopping_monitor = "validation_loss"
-    if protein_gt_column is not None:
-        gt_collate_fn = lambda masked_datasets: collator.collate(
+
+    def gt_collate_fn(masked_ds_samples: Tuple[MaskedDataset, List[str]]):
+        masked_datasets = []
+        samples_lists = []
+        for masked_ds, samples in masked_ds_samples:
+            masked_datasets.append(masked_ds)
+            samples_lists.append(samples)
+        return collator.collate(
             masked_dataset_to_homogeneous_graph(
                 masked_datasets=masked_datasets,
                 mappings=[mapping],
                 target="abundance_gt",
-                features=[],
+                features=feature_names,
+                sample_lists=samples_lists,
             )
         )
+
+    train_dl = DataLoader(mask_ds, batch_size=1, collate_fn=collate_fn)
+    graph = list(train_dl)[0]
+    num_embeddings = int(graph.ndata[dgl.NID].max().item() + 1)
+    val_dls = [DataLoader(validation_set, batch_size=1, collate_fn=collate_fn)]
+    early_stopping_monitor = "train_loss"
+    if molecule_gt_column is not None:
         gt_ds = mask_missing(dataset=in_dataset, molecule=molecule, column="abundance")
-        gt_dl = DataLoader([gt_ds], batch_size=1, collate_fn=gt_collate_fn)
-        eval_dl = [eval_dl, gt_dl]
+        if train_sample_wise:
+            gt_ds = [(gt_ds, [s]) for s in in_dataset.sample_names]
+        else:
+            gt_ds = [(gt_ds, None)]
+        gt_dl = DataLoader(gt_ds, batch_size=1, collate_fn=gt_collate_fn)
+        val_dls.append(gt_dl)
         early_stopping_monitor = "validation_loss/dataloader_idx_0"
 
-    num_samples = len(in_dataset.sample_names)
+    num_samples = in_dataset.num_samples
     # heads = [num_samples, num_samples]  # [num_samples]
     # dimensions = [8 * num_smples, 4*num_samples, 2*num_samples]
     heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
-    #heads = [8 * num_samples]
-    #dimensions = [8]
-    dimensions = [8, 8, 4] # [1]#, num_samples, num_samples]
-    print(heads)
-    print(dimensions)
+    # heads = [8 * num_samples]
+    # dimensions = [8]
+    dimensions = [
+        4 * num_samples,
+        4 * num_samples,
+        4 * num_samples,
+    ]  # [1]#, num_samples, num_samples]
+    #print(heads)
+    #print(dimensions)
     # module = GatNodeImputer(in_dim = num_samples + 2,
     #                         heads=heads, gat_dims=dimensions,
     #                         mask_substitute_value=missing_substitute_value, hide_substitute_value=missing_substitute_value,
     #                         nan_substitute_value=missing_substitute_value,
     #                         out_dim=num_samples, use_gatv2=use_gatv2, initial_dense_layers=[8*num_samples, num_samples])
     module = UncertaintyGatNodeImputer(
-        in_dim=num_samples + 2,
+        in_dim=1+ 2 + len(feature_names) if train_sample_wise else 2 + num_samples + num_samples * len(feature_names),
         heads=heads,
         gat_dims=dimensions,
         mask_substitute_value=missing_substitute_value,
         hide_substitute_value=missing_substitute_value,
         nan_substitute_value=missing_substitute_value,
-        out_dim=num_samples,
+        out_dim=1 if train_sample_wise else num_samples,
         use_gatv2=use_gatv2,
         initial_dense_layers=[
             8 * num_samples,
-            2 * num_samples
+            8 * num_samples,
+            4 * num_samples,
         ],  # [8 * num_samples, 2 * num_samples]
         dropout=0.2,
         lr=0.001,
         num_embeddings=num_embeddings,
-        embedding_dim=embedding_dim
+        embedding_dim=embedding_dim,
+        average_heads = True
     )
 
     if logger is None:
@@ -416,7 +480,7 @@ def impute_all_sample_homogeneous_gnn(
                 )
             ],
         )
-        trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=eval_dl)
+        trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=val_dls)
     else:
         module.uncertainty_loss = True
         module.lr = 0.0001
@@ -434,46 +498,83 @@ def impute_all_sample_homogeneous_gnn(
                 )
             ],
         )
-        trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=eval_dl)
+        trainer.fit(module, train_dataloaders=train_dl, val_dataloaders=val_dls)
 
     predict_ds = mask_missing(dataset=in_dataset, molecule=molecule, column="abundance")
-    predict_graph = predict_ds.to_dgl_graph(
-        molecule_features={
-            mol: ["abundance"] for mol in predict_ds.dataset.molecules.keys()
-        },
-        mappings=[mapping],
+
+
+    # pred_dl = DataLoader([(predict_ds, s) for s in in_dataset.sample_names], batch_size=1, collate_fn=collate_fn)
+    # predictions = trainer.predict(
+    #     module, dataloaders=pred_dl, ckpt_path=None
+    # )
+    pred_graphs = []
+    if train_sample_wise:
+        sample_lists = [[s] for s in in_dataset.sample_names]
+    else:
+        sample_lists = [in_dataset.sample_names]
+    for s in sample_lists:
+        pred_graphs.append(
+            predict_ds.to_dgl_graph(
+                feature_columns={
+                    mol: ["abundance"] + feature_names for mol in predict_ds.dataset.molecules.keys()
+                },
+                mappings=[mapping],
+                samples=s,
+            )
+        )
+    ntypes = [pred_graph.ntypes for pred_graph in pred_graphs]
+    pred_graphs = masked_heterograph_to_homogeneous(
+        masked_heterographs=pred_graphs, target="abundance", features=feature_names,
     )
-    ntypes = predict_graph.ntypes
-    predict_graph = masked_heterograph_to_homogeneous(
-        masked_heterographs=[predict_graph], target="abundance", features=[]
-    )[0]
-    protein_index = ntypes.index(molecule)
-    protein_mask = (predict_graph.ndata[dgl.NTYPE] == protein_index).type(torch.bool)
-    res = trainer.predict(
-        module, DataLoader([predict_graph], batch_size=1, collate_fn=collator.collate)
-    )[0]
-    prot_res = res[protein_mask]
-    masked_proteins = predict_graph.ndata["mask"][protein_mask].type(torch.bool)
-    protein_ids = predict_graph.ndata[dgl.NID][protein_mask].type(torch.int64)
-    prot_res = prot_res[protein_ids, :]
-    masked_proteins = masked_proteins[protein_ids, :]
-    mat_pd = in_dataset.get_samples_value_matrix(molecule=molecule, column="abundance")
-    mat = mat_pd.to_numpy()
-    mat[masked_proteins.numpy()] = prot_res[masked_proteins].numpy()[:, 0]
-    # mat[:, :] = prot_res[:, :].numpy()
-    mat_pd.loc[:, :] = mat
-    in_dataset.set_samples_value_matrix(
-        matrix=mat_pd, molecule=molecule, column="abundance"
+    results = trainer.predict(
+        module, DataLoader(pred_graphs, batch_size=1, collate_fn=collator.collate)
     )
+    for predict_graph, res, s, nt in zip(pred_graphs, results, sample_lists, ntypes):
+        molecule_index = nt.index(molecule)
+        molecule_mask = (predict_graph.ndata[dgl.NTYPE] == molecule_index).type(torch.bool)
+        molecule_res = res[molecule_mask]
+        masked_molecules = predict_graph.ndata["mask"][molecule_mask].type(torch.bool)
+        molecule_ids = predict_graph.ndata[dgl.NID][molecule_mask].type(torch.int64)
+        molecule_res = molecule_res[molecule_ids, :]
+        masked_molecules = masked_molecules[molecule_ids, :]
+        mat_pd = in_dataset.get_samples_value_matrix(molecule=molecule, column="abundance", samples=s)
+        mat = mat_pd.to_numpy()
+        mat[masked_molecules.numpy()] = molecule_res[masked_molecules].numpy()[:, 0]
+        # mat[:, :] = prot_res[:, :].numpy()
+        mat_pd.loc[:, :] = mat
+        in_dataset.set_samples_value_matrix(
+            matrix=mat_pd, molecule=molecule, column="abundance"
+        )
+        if train_on_partner and partner_result_column is not None:
+            partner_index = nt.index(partner_molecule)
+            partner_mask = (predict_graph.ndata[dgl.NTYPE] == partner_index).type(torch.bool)
+            partner_res = res[partner_mask]
+            masked_partner_mols = predict_graph.ndata["mask"][partner_mask].type(torch.bool)
+            partner_ids = predict_graph.ndata[dgl.NID][partner_mask].type(torch.int64)
+            partner_res = partner_res[partner_ids, :]
+            masked_partner_mols = masked_partner_mols[partner_ids, :]
+            mat_pd = in_dataset.get_samples_value_matrix(molecule=partner_molecule, column="abundance", samples=s)
+            mat = mat_pd.to_numpy()
+            mat[masked_partner_mols.numpy()] = partner_res[masked_partner_mols].numpy()[:, 0]
+            # mat[:, :] = prot_res[:, :].numpy()
+            mat_pd.loc[:, :] = mat
+            in_dataset.set_samples_value_matrix(
+                matrix=mat_pd, molecule=partner_molecule, column="abundance"
+            )
     normalizer.unnormalize(dataset=in_dataset, inplace=True)
     vals = dataset.values[molecule][column]
     res_vals = in_dataset.values[molecule]["abundance"]
     vals.loc[vals.isna(), :] = res_vals.loc[vals.isna(), :]
     if result_column is not None:
         dataset.values[molecule][result_column] = vals
+    if partner_result_column is not None:
+        vals = dataset.values[partner_molecule][partner_column]
+        res_vals = in_dataset.values[partner_molecule]["abundance"]
+        vals.loc[vals.isna(), :] = res_vals.loc[vals.isna(), :]
+        dataset.values[partner_molecule][partner_result_column] = vals
     if uncertainty_column is not None:
         mat[:, :] = np.nan
-        mat[masked_proteins.numpy()] = prot_res[masked_proteins].numpy()[:, 1]
+        mat[masked_molecules.numpy()] = molecule_res[masked_molecules].numpy()[:, 1]
         mat_pd.loc[:, :] = mat
         dataset.set_samples_value_matrix(
             matrix=mat_pd, molecule=molecule, column=uncertainty_column

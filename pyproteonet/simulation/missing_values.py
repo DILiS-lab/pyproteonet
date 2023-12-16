@@ -93,7 +93,7 @@ def simulate_mcars_sample(
     else:
         mcar_mask = rng.choice(mask.shape[0], size=amount, replace=False)
     mask[:] = False
-    mask[mcar_mask] = True
+    mask.iloc[mcar_mask] = True
     if result_column is None:
         result_column = column
     else:

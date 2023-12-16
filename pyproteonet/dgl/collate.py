@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import dgl
 import torch
@@ -6,11 +6,17 @@ import torch
 from ..data.masked_dataset import MaskedDataset
 
 
-def masked_dataset_to_homogeneous_graph(masked_datasets: List[MaskedDataset], mappings: List[str], target:str, features:List[str]=[])->dgl.DGLGraph:
+def masked_dataset_to_homogeneous_graph(masked_datasets: List[MaskedDataset], mappings: List[str], target:str, features:List[str]=[],
+                                        sample_lists: Optional[List[str]] = None)->dgl.DGLGraph:
     graphs = []
-    for masked_dataset in masked_datasets:
-        graph = masked_dataset.to_dgl_graph(molecule_features={mol:[target] + features for mol in masked_dataset.dataset.molecules.keys()},
-                                             mappings=mappings)
+    if sample_lists is None:
+        sample_lists = [masked_dataset.dataset.sample_names for masked_dataset in masked_datasets]
+    else:
+        if len(sample_lists) != len(masked_datasets):
+            raise ValueError('sample_lists must have the same length as masked_datasets')
+    for masked_dataset, samples in zip(masked_datasets, sample_lists):
+        graph = masked_dataset.to_dgl_graph(feature_columns={mol:[target] + features for mol in masked_dataset.dataset.molecules.keys()},
+                                            mappings=mappings, samples=samples)
         graphs.append(graph)
     graphs = masked_heterograph_to_homogeneous(masked_heterographs=graphs, target=target, features=features)
     return graphs
@@ -20,8 +26,8 @@ def masked_heterograph_to_homogeneous(masked_heterographs: List[dgl.DGLGraph], t
     for graph in masked_heterographs:
         graph = dgl.to_homogeneous(graph, ndata= [target] + features + ['mask', 'hidden'])
         molecule_type = torch.nn.functional.one_hot(graph.ndata[dgl.NTYPE])
-        features = [graph.ndata[f] for f in features]
-        x = torch.concat(features + [molecule_type], axis=-1)
+        x = [graph.ndata[f] for f in features]
+        x = torch.concat(x + [molecule_type], axis=-1)
         graph.ndata['features'] = x
         graph.ndata['target'] = graph.ndata[target]
         pop_keys = []

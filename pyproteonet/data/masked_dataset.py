@@ -145,42 +145,48 @@ class MaskedDataset(AbstractMaskedDataset):
 
     def to_dgl_graph(
         self,
-        molecule_features: Dict[str, Union[str, List[str]]],
+        feature_columns: Dict[str, Union[str, List[str]]],
         mappings: Union[str, List[str]],
         mapping_directions: Dict[str, Tuple[str, str]] = {},
         make_bidirectional: bool = False,
         features_to_float32: bool = True,
         cache: bool = True,
         update_cache: bool = False,
+        samples: Optional[List[str]] = None
     ) -> dgl.DGLHeteroGraph:
         g = self.dataset.to_dgl_graph(
-            molecule_features=molecule_features,
+            feature_columns=feature_columns,
             mappings=mappings,
             mapping_directions=mapping_directions,
             make_bidirectional=make_bidirectional,
             features_to_float32=features_to_float32,
             cache=cache,
             update_cache=update_cache,
+            samples = samples
         )
-        num_samples = len(self.dataset.sample_names)        
-        for mol, mol_features in molecule_features.items():
+        if samples is None:
+            samples = self.dataset.sample_names
+        num_samples = len(samples)    
+        for mol, mol_features in feature_columns.items():
             mol_ids = self.dataset.molecules[mol].index
             if mol in self.masks:
-                g.nodes[mol].data["mask"] = torch.from_numpy(
-                    self.masks[mol].loc[mol_ids].to_numpy()
+                mask = torch.from_numpy(
+                    self.masks[mol].loc[mol_ids, samples].to_numpy()
                 )
             else:
-                g.nodes[mol].data["mask"] = torch.full(
+                mask = torch.full(
                     (mol_ids.shape[0], num_samples), False
                 )
             if mol in self.hidden:
-                g.nodes[mol].data["hidden"] = torch.from_numpy(
-                    self.hidden[mol].loc[mol_ids].to_numpy()
+                hidden = torch.from_numpy(
+                    self.hidden[mol].loc[mol_ids, samples].to_numpy()
                 )
             else:
-                g.nodes[mol].data["hidden"] = torch.full(
+                hidden = torch.full(
                     (mol_ids.shape[0], num_samples), False
                 )
+            g.nodes[mol].data["mask"] = mask
+            g.nodes[mol].data["hidden"] = hidden
         return g
 
 
