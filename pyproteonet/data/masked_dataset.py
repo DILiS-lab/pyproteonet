@@ -99,15 +99,25 @@ class MaskedDataset(AbstractMaskedDataset):
         matrix: Union[np.array, pd.DataFrame],
         molecule: str,
         column: str,
+        samples: Optional[List[str]] = None,
         only_set_masked: bool = True,
     ) -> None:
-        mol_ids = self.dataset.molecules[molecule].index
-        mat_df = self.dataset.get_samples_value_matrix(molecule=molecule, column=column)
-        mat_df = mat_df.loc[mol_ids]
         if isinstance(matrix, pd.DataFrame):
+            if samples is None:
+                samples = matrix.columns
+            else:
+                if set(samples) != set(matrix.columns):
+                    raise ValueError(
+                        "If samples names are provided the column names in the matrix must match the samples names"
+                    )
             matrix = matrix.values
+        if samples is None:
+            samples = self.dataset.sample_names
+        mol_ids = self.dataset.molecules[molecule].index
+        mat_df = self.dataset.get_samples_value_matrix(molecule=molecule, column=column, samples=samples)
+        mat_df = mat_df.loc[mol_ids]
         if only_set_masked:
-            mask = self.masks[molecule].loc[mol_ids].values
+            mask = self.masks[molecule].loc[mol_ids, samples].values
             mat_df.values[mask] = matrix[mask]
         else:
             mat_df.values[:, :] = matrix
@@ -150,8 +160,6 @@ class MaskedDataset(AbstractMaskedDataset):
         mapping_directions: Dict[str, Tuple[str, str]] = {},
         make_bidirectional: bool = False,
         features_to_float32: bool = True,
-        cache: bool = True,
-        update_cache: bool = False,
         samples: Optional[List[str]] = None
     ) -> dgl.DGLHeteroGraph:
         g = self.dataset.to_dgl_graph(
@@ -160,8 +168,6 @@ class MaskedDataset(AbstractMaskedDataset):
             mapping_directions=mapping_directions,
             make_bidirectional=make_bidirectional,
             features_to_float32=features_to_float32,
-            cache=cache,
-            update_cache=update_cache,
             samples = samples
         )
         if samples is None:

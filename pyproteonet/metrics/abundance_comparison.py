@@ -19,6 +19,8 @@ def _get_metric_from_str(metric: str):
         res = lambda val, gt: [((val - gt).abs()).mean()]
     elif metric == "rmse":
         res = lambda val, gt: [(((val - gt) ** 2).mean()) ** 0.5]
+    elif metric == "ae":
+        res = lambda val, gt: ((val - gt)).abs()
     else:
         raise AttributeError(f"Metric {metric} not found!")
     return res
@@ -30,7 +32,7 @@ def _compare_columns_single_dataset(
     columns: List[str],
     comparison_column: str,
     ids: Optional[pd.Index] = None,
-    metric: Union[Literal['PearsonR', 'SpearmanR', 'MSE', 'MAE', 'RMSE'], Callable[[pd.Series, pd.Series], pd.Series]] = 'PearsonR',
+    metric: Union[Literal['PearsonR', 'SpearmanR', 'MSE', 'MAE', 'RMSE', 'AE'], Callable[[pd.Series, pd.Series], pd.Series]] = 'PearsonR',
     ignore_missing: bool = True,
     logarithmize: bool = True,
     per_sample: bool = False,
@@ -83,8 +85,9 @@ def _compare_columns_single_dataset(
                 assert gt[sample].shape[0] == val[sample].shape[0]
                 cnt[sample] = gt[sample].shape[0]
                 met = metric(gt[sample], val[sample])
-                if replace_nan_metric_with is not None and np.isnan(met):
-                    met = [replace_nan_metric_with]
+                met = np.array(met)
+                if replace_nan_metric_with is not None and np.isnan(met).any():
+                    met[np.isnan(met)] = replace_nan_metric_with
                 r[sample] = met
             res[c] = r
             counts[c] = cnt
@@ -105,7 +108,7 @@ def compare_columns(
     columns: List[str],
     comparison_column: str,
     ids: Optional[pd.Index] = None,
-    metric: Literal['PearsonR', 'SpearmanR', 'MSE', 'MAE', 'RMSE'] = 'PearsonR',
+    metric: Literal['PearsonR', 'SpearmanR', 'MSE', 'MAE', 'RMSE', 'AE'] = 'PearsonR',
     ignore_missing: bool = True,
     logarithmize: bool = True,
     per_sample: bool = False,
