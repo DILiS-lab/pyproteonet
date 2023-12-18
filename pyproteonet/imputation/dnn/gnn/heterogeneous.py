@@ -58,7 +58,7 @@ class ImputationModule(L.LightningModule):
         else:
             self.embedding = None
             embedding_dim = 0
-        for dense_layers, fc_in_dim in [(dense_layers_partner, in_dim), (dense_layers_molecule, in_dim + embedding_dim)]:
+        for dense_layers, fc_in_dim in [(dense_layers_partner, in_dim), (dense_layers_molecule, embedding_dim)]:
             last_dim = fc_in_dim
             for dim in layers:
                 dense_layers.append(nn.Linear(last_dim, dim))
@@ -102,7 +102,7 @@ class ImputationModule(L.LightningModule):
                 )
             }
         )
-        self.molecule_linear = nn.Linear(gat_dim + fc_out_dim, 2 * in_dim)
+        self.molecule_linear = nn.Linear(gat_dim, 2 * in_dim)
         self.partner_linear = nn.Linear(gat_dim + fc_out_dim, 2 * in_dim)
         self.loss_fn = torch.nn.GaussianNLLLoss()
         self.lr = lr
@@ -121,10 +121,10 @@ class ImputationModule(L.LightningModule):
             ab[torch.isnan(ab)] = self.mask_value
         partner_inputs = abundance[self.partner_molecule]
         molecule_inputs = abundance[self.molecule]
-        if self.embedding is not None:
-            molecule_inputs = torch.cat((self.embedding(graph.nodes(self.molecule).int()), molecule_inputs), dim=-1)
+        # if self.embedding is not None:
+        #     molecule_inputs = torch.cat((self.embedding(graph.nodes(self.molecule).int()), molecule_inputs), dim=-1)
         partner_fc_vec = self.partner_fc_model(partner_inputs)
-        molecule_fc_vec = self.molecule_fc_model(molecule_inputs)
+        molecule_fc_vec = self.molecule_fc_model(self.embedding(graph.nodes(self.molecule).int()))
         mol_vec = nn.functional.leaky_relu(
             self.molecule_gat(graph, ({self.partner_molecule:partner_fc_vec}, {self.molecule:molecule_fc_vec}))[self.molecule].mean(dim=-2)
         )
@@ -136,7 +136,7 @@ class ImputationModule(L.LightningModule):
         )
         # output = output.view(output.shape[0], -1)
         # reshape molecule vector
-        mol_vec = torch.cat((mol_vec, molecule_fc_vec), dim=-1)
+        #mol_vec = torch.cat((mol_vec, molecule_fc_vec), dim=-1)
         mol_vec = self.molecule_linear(mol_vec)
         mol_shape = list(mol_vec.shape)
         mol_shape[-1] = int(mol_shape[-1] / 2)
@@ -315,9 +315,10 @@ def impute_heterogeneous_gnn(
     partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
     rng = np.random.default_rng()
     def masking_fn(in_ds):
-        molecule_ids = in_ds.molecules[molecule].sample(frac=training_fraction).index
+        epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
+        molecule_ids = in_ds.molecules[molecule].sample(frac=epoch_masking_fraction).index
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
-        molecule_mask_ids = molecule_mask_ids[molecule_mask_ids.index.get_level_values('id').isin(molecule_ids)]
+        #molecule_mask_ids = molecule_mask_ids[molecule_mask_ids.index.get_level_values('id').isin(molecule_ids)]
         molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()].index
         # molecule_mask_ids = (
         #     molecule_mask_ids#[~molecule_mask_ids.index.isin(validation_ids)]
@@ -329,7 +330,6 @@ def impute_heterogeneous_gnn(
         #partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
         # partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(partner_molecules)]
         #partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
-        epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
         partner_ids = (
             partner_mask_ids#[~partner_mask_ids.index.isin(partner_validation_ids)]
             .sample(frac=epoch_masking_fraction)
@@ -389,7 +389,7 @@ def impute_heterogeneous_gnn(
         dropout=0.1,
         lr=0.01,
         num_embeddings=num_embeddings,
-        embedding_dim=molecule_embedding_dim,
+        embedding_dim=max(4, ds.num_samples // 2),
     )
     if logger is None:
         logger = ConsoleLogger()

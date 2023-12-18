@@ -350,14 +350,17 @@ def impute_homogeneous_gnn(
     rng = np.random.default_rng()
     def masking_fn(in_ds):
         mask_ids = {}
-        hidden_ids = {molecule: validation_ids}
+        hidden_ids = {}#molecule: validation_ids}
+        epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
+        molecule_ids = in_ds.molecules[molecule].sample(frac=epoch_masking_fraction).index
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
-        molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()]
-        molecule_mask_ids = (
-            molecule_mask_ids#[~molecule_mask_ids.index.isin(validation_ids)]
-            .sample(frac=training_fraction)
-            .index
-        )
+        molecule_mask_ids = molecule_mask_ids[molecule_mask_ids.index.get_level_values("id").isin(molecule_ids)]
+        molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()].index
+        # molecule_mask_ids = (
+        #     molecule_mask_ids#[~molecule_mask_ids.index.isin(validation_ids)]
+        #     .sample(frac=training_fraction)
+        #     .index
+        # )
         mask_ids[molecule] = molecule_mask_ids
         molecules = molecule_mask_ids.get_level_values("id").unique()
         # partner_molecules = (
@@ -373,7 +376,6 @@ def impute_homogeneous_gnn(
         # partner_mask_ids = partner_mask_ids.sample(  # [~partner_mask_ids.index.isin(partner_validation_ids)]
         #     frac=masking_fraction
         # ).index
-        epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
         partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
         partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
         partner_mask_ids = partner_mask_ids.sample(frac=epoch_masking_fraction).index
