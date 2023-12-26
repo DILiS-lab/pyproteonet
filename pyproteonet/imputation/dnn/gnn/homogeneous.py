@@ -435,7 +435,7 @@ def impute_homogeneous_gnn(
         val_dls = []
     early_stopping_monitor = "train_loss"
     if molecule_gt_column is not None:
-        gt_ds = mask_missing(dataset=in_dataset, molecule=molecule, column="abundance")
+        gt_ds = mask_missing(dataset=in_dataset, molecule_columns={molecule:"abundance"})
         if train_sample_wise:
             gt_ds = [(gt_ds, [s]) for s in in_dataset.sample_names]
         else:

@@ -246,7 +246,8 @@ def impute_heterogeneous_gnn(
     log_every_n_steps: Optional[int] = None,
     early_stopping_patience: int = 5,
     logger: Optional[Logger] = None,
-    epoch_size: int = 10
+    epoch_size: int = 10,
+    masking_seed: Optional[int] = None,
 ) -> pd.Series:
     molecule, mapping, partner_molecule = dataset.infer_mapping(
         molecule=molecule, mapping=mapping
@@ -313,7 +314,11 @@ def impute_heterogeneous_gnn(
     partner_mask_ids = ds.values[partner_molecule]["abundance"]
     partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(mapping_df.index.get_level_values(partner_molecule).unique())]
     partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
-    rng = np.random.default_rng()
+    import random
+    if masking_seed is None:
+        masking_seed = random.randint(0, 1000000000)
+    print(f"seed: {masking_seed}")
+    rng = np.random.default_rng(masking_seed)
     def masking_fn(in_ds):
         epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
         molecule_ids = in_ds.molecules[molecule].sample(frac=epoch_masking_fraction).index
