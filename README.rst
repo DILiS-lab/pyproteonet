@@ -32,3 +32,7 @@ Afterward you can clone and install pyproteonet in the created Conda/Mamba envir
 Getting Started and Overview
 ============================
 There is a `Getting Started Notebook <https://github.com/Tobias314/pyproteonet/blob/main/docs/source/notebooks/getting_started.ipynb>`_ which gives a first overview of how PyProteoNet can be used
+
+Documentation
+============================
+There is a `Read the Docs <https://pyproteonet.readthedocs.io/en/latest>`_ page containing more examples and documentation.
