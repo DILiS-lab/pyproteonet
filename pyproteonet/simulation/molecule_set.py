@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import math
 
 import numpy as np
@@ -10,6 +10,40 @@ from .utils import get_numpy_random_generator
 from ..data.dataset_sample import DatasetSample
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
+
+def molecule_set_from_degree_distribution(protein_degree_distribution: List[int] = [2, 5, 7, 7], peptide_degree_distribution: List[int] = [1, 20, 10],
+                                          random_seed: Optional[int] = None)->MoleculeSet:
+    rng = get_numpy_random_generator(seed=random_seed)
+    num_prot_edges = (np.arange(len(protein_degree_distribution)) * protein_degree_distribution).sum()
+    num_pep_edges = (np.arange(len(peptide_degree_distribution)) * peptide_degree_distribution).sum()
+    if num_prot_edges != num_pep_edges:
+        raise ValueError("Sum of protein degrees must match sum of peptide degrees")
+    prot_degs = np.repeat(np.arange(len(protein_degree_distribution)), protein_degree_distribution)
+    pep_degs = np.repeat(np.arange(len(peptide_degree_distribution)), peptide_degree_distribution)
+    prot_ids = np.repeat(np.arange(len(prot_degs)), prot_degs)
+    pep_ids = np.repeat(np.arange(len(pep_degs)), pep_degs)
+    edges = np.stack((prot_ids, pep_ids), axis=1)
+    while True:
+        unique, ids, counts = np.unique(edges, axis=0, return_counts=True, return_inverse=True)
+        mask = counts > 1
+        if not mask.any():
+            break
+        duplicates = np.repeat(unique[mask], counts[mask] - 1, axis=0)
+        rewired = []
+        for dup in duplicates:
+            id1 = rng.integers(unique.shape[0])
+            id2 = rng.integers(2)
+            dup[id2], unique[id1, id2] = unique[id1, id2], dup[id2]
+            rewired.append(dup)
+        edges = np.concatenate((unique, rewired), axis=0)
+    proteins = pd.DataFrame(index=np.arange(prot_ids.max()+1))
+    peptides = pd.DataFrame(index=np.arange(pep_ids.max()+1))
+    mapping = pd.DataFrame({'peptide':edges[:,1], 'protein':edges[:,0]})
+    mapping.set_index(['peptide', 'protein'], inplace=True)
+    ms = MoleculeSet(molecules = {'protein':proteins, 'peptide':peptides},
+                     mappings = {'peptide-protein': mapping}
+                    )
+    return ms
 
 def _relative_to_absolute_node_degrees(relative_node_degrees: List[float], num_nodes: int)->List[int]:
     assert abs(sum(relative_node_degrees) * num_nodes - num_nodes) < 1.0 #relative_node_degrees sum up to one (neglecting floating point inaccuracies)

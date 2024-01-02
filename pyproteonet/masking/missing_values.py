@@ -1,11 +1,25 @@
 import pandas as pd
 import numpy as np
 
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 
 from ..data.dataset import Dataset
 from ..data.masked_dataset import MaskedDataset
 from ..simulation.utils import get_numpy_random_generator
+
+
+def mask_missing(
+    dataset: Dataset,
+    molecule_columns: Dict[str, str]
+) -> MaskedDataset:
+    masks = dict()
+    for molecule, column in molecule_columns.items():
+        mask = pd.DataFrame(index=dataset.molecule_set.molecules[molecule].index)
+        for sample_name, sample in dataset.samples_dict.items():
+            mask[sample_name] = False
+            mask.loc[sample.missing_mask(molecule=molecule, column=column), sample_name] = True
+        masks[molecule] = mask
+    return MaskedDataset(dataset=dataset, masks=masks)
 
 def mask_non_missing(dataset: Dataset, 
     molecule: str,

@@ -6,7 +6,8 @@ import lightning.pytorch as pl
 
 from ..data.dataset import Dataset
 from ..predictors.gnn import GnnPredictor
-from ..masking.masking import train_test_non_missing_no_overlap_iterable, mask_missing, non_missing_iterable
+from ..masking.masking import train_test_non_missing_no_overlap_iterable, non_missing_iterable
+from ..masking.missing_values import mask_missing
 from ..dgl.gnn_architectures.gat import GAT
 from ..lightning.console_logger import ConsoleLogger
 from ..data.masked_dataset import MaskedDataset

@@ -30,8 +30,8 @@ def plot_des_volcano(
         dataset=dataset,
         molecule=molecule,
         columns=columns,
-        group1_samples=numerator_samples,
-        group2_samples=denominator_samples,
+        nominator_samples=numerator_samples,
+        denominator_samples=denominator_samples,
         is_log = is_log
     )
     if ids is not None:
@@ -48,4 +48,6 @@ def plot_des_volcano(
         ax.set_ylabel('-$Log_{10}$(p_value)')
         ax.set_xlabel('$Log_2$(fold_change)')
         ax.legend()
+    for ax in axs[len(columns):]:
+        ax.set_axis_off()
     return des, p_values, fc

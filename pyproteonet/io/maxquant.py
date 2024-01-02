@@ -53,7 +53,6 @@ def load_maxquant(
         if isinstance(protein_groups_table, (str, Path)):
             protein_groups_table = pd.read_csv(protein_groups_table, sep="\t")
         protein_groups = protein_groups_table.loc[:, protein_group_columns]
-
     peptides = peptides_table.loc[:, peptide_columns].copy()
     map = peptides_table["Protein group IDs"].astype(str).str.split(";").explode().astype(int)
     map = map.reset_index().rename(columns={"index": "peptide", "Protein group IDs": "protein_group"})

@@ -27,8 +27,8 @@ class MaskedDatasetAdapter:
         if "mask" in value_columns or "mask" in molecule_columns:
             raise KeyError('"mask" is a reserved column name and cannot be part of the value/molecule columns')
         if masked_dataset.has_hidden:
-            if "hide" in value_columns or "hide" in molecule_columns:
-                raise KeyError('"hide" is a reserved column name and cannot be part of the value/molecule columns')
+            if "hidden" in value_columns or "hidden" in molecule_columns:
+                raise KeyError('"hidden" is a reserved column name and cannot be part of the value/molecule columns')
         self.mapping = mapping
         self.value_columns = value_columns
         self.molecule_columns = molecule_columns
@@ -55,5 +55,5 @@ class MaskedDatasetAdapter:
         if hidden_nodes is not None and len(hidden_nodes) > 0:
             hide_mask = torch.zeros(graph.num_nodes(), dtype=torch.bool)
             hide_mask[hidden_nodes] = 1
-            graph.nodes["molecule"].data["hide"] = hide_mask
+            graph.nodes["molecule"].data["hidden"] = hide_mask
         return graph

@@ -45,7 +45,6 @@ def impute_pca_method(
     mat_np = mat.to_numpy()
     mask = ~np.isnan(mat_np).all(axis=1)
     with (robjects.default_converter + numpy2ri.converter).context():
-        #import pdb; pdb.set_trace()
         if molecules_as_variables:
             in_ = nan_to_na(mat_np[mask, :].T)
         else:
