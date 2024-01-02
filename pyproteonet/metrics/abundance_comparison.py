@@ -118,10 +118,10 @@ def compare_columns(
         dataset = [dataset]
     res_dfs = []
     for i_ds, ds in enumerate(dataset):
-        metric, counts = _compare_columns_single_dataset(dataset=ds, molecule=molecule, columns=columns, comparison_column=comparison_column,
-                                                         ids=ids, metric=metric, ignore_missing=ignore_missing, logarithmize=logarithmize,
-                                                         per_sample=per_sample, return_counts=True, replace_nan_metric_with=replace_nan_metric_with)
-        for col, met in metric.items():
+        metric_vals, counts = _compare_columns_single_dataset(dataset=ds, molecule=molecule, columns=columns, comparison_column=comparison_column,
+                                                              ids=ids, metric=metric, ignore_missing=ignore_missing, logarithmize=logarithmize,
+                                                              per_sample=per_sample, return_counts=True, replace_nan_metric_with=replace_nan_metric_with)
+        for col, met in metric_vals.items():
             cnt = counts[col]
             if per_sample:
                 col_df = []

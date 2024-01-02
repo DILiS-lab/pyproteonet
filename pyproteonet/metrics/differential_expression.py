@@ -22,9 +22,12 @@ def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]],
         if is_log:
             mat = math.e**mat
         log_mat = np.log2(mat)
-        test_res = ttest_ind(log_mat[nominator_samples].to_numpy(), log_mat[denominator_samples].to_numpy(), axis=1, nan_policy='omit')
-        pvalues = pd.Series(test_res.pvalue.data, index=mat.index)
-        pvalues[pvalues.isna()] = 1.0
+        eps = np.finfo(np.finfo(float).eps).eps
+        mask = (log_mat[nominator_samples].var(axis=1) > eps) & (log_mat[denominator_samples].var(axis=1) > eps)
+        test_mat = log_mat.loc[mask, :]
+        test_res = ttest_ind(test_mat[nominator_samples].to_numpy(), test_mat[denominator_samples].to_numpy(), axis=1, nan_policy='omit')
+        pvalues = pd.Series(1.0, index=mat.index)
+        pvalues.loc[mask] = test_res.pvalue
         correction_res = multipletests(pvals=pvalues, alpha=max_pvalue, method='fdr_bh')
         des[c] = correction_res[0]
         pvalues_mat[c] = correction_res[1]
@@ -51,11 +54,12 @@ def evaluate_des(dataset: Dataset, molecule: str, columns: Union[str, List[str]]
         prec_rec_eval = pd.DataFrame({'Correct DE':correctly_found.sum()})
         prec_rec_eval['Correct no DE'] = correctly_not_found.sum() 
         prec_rec_eval['Correctly Classified'] = (gt_de == des).sum() 
-        prec_rec_eval['False Positives'] = (des & (gt_de)).sum()
+        prec_rec_eval['False Positives'] = (des & (~gt_de)).sum()
     else:
         prec_rec_eval = pd.DataFrame({'Recall':correctly_found.sum() / gt_de.sum()})
         prec_rec_eval['Precision'] = correctly_found.sum() / des.sum()
-        prec_rec_eval['Specificity'] = correctly_not_found.sum() / (~des).sum()
+        prec_rec_eval['Specificity'] = correctly_not_found.sum() / (~gt_de).sum()
         prec_rec_eval['Accuracy'] = (gt_de == des).sum() / gt_de.count()
-        prec_rec_eval['FP Rate'] = (des & (gt_de)).sum() / (~gt_de).sum()
+        prec_rec_eval['FP Rate'] = (des & (~gt_de)).sum() / (~gt_de).sum()
+        prec_rec_eval['F1 Score'] = 2 * prec_rec_eval['Precision'] * prec_rec_eval['Recall'] / (prec_rec_eval['Precision'] + prec_rec_eval['Recall'])
     return prec_rec_eval
