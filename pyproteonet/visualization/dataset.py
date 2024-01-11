@@ -15,6 +15,6 @@ def plot_dataset_values_violins(dataset: Dataset, molecule: str, column: str, ax
     pep_vals = pd.DataFrame({'abundance':np.log(pep_vals), 'Sample':pep_vals.index.get_level_values('sample')})
     overall = pep_vals.copy()
     overall['Sample'] = 'Overall'
-    sns.violinplot(data=pd.concat([pep_vals, overall]), y='abundance', x='Sample', ax=ax)
+    sns.violinplot(data=pd.concat([pep_vals, overall]).reset_index(), y='abundance', x='Sample', ax=ax)
     plt.setp(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
     ax.set_ylabel(f'$Log_e({molecule} Abundance)$')

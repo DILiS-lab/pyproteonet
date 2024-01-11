@@ -124,7 +124,7 @@ class ProteinPeptideDatasetMocker:
                 dataset=sim_ds,
                 amount=mcar_frac,
                 rng=random_seed,
-                molecule="peptide",
+                molecule=self.peptide_molecule,
                 column="abundance_missing",
                 result_column="abundance_missing",
                 inplace=True,

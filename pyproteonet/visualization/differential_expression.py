@@ -45,8 +45,8 @@ def plot_des_volcano(
             sbn.scatterplot(x=np.log2(fc[c]), y=-np.log10(p_values[c]), hue=categories, ax=ax, s=s, linewidth=0)
         ax.axhline(y=-np.log10(alpha), linestyle='dotted')
         ax.set_title(c)
-        ax.set_ylabel('-$Log_{10}$(p_value)')
-        ax.set_xlabel('$Log_2$(fold_change)')
+        ax.set_ylabel('-$Log_{10}$(p value)')
+        ax.set_xlabel('$Log_2$(fold change)')
         ax.legend()
     for ax in axs[len(columns):]:
         ax.set_axis_off()

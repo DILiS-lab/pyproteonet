@@ -24,7 +24,7 @@ def plot_ratio_scatter(
     plot_density: bool = False,
     uncertainty_columns: Optional[List[str]] = None,
     s: float = 10,
-    alpha: Optional[float] = None
+    alpha: Optional[float] = None,
 ):
     markers = ["o", "x", "D", "^", "v"]
     if categories is None:

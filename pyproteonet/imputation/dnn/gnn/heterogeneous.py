@@ -1,4 +1,5 @@
 from typing import Any, Optional, List, Tuple
+import random
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 
 import numpy as np
@@ -104,7 +105,7 @@ class ImputationModule(L.LightningModule):
         )
         self.molecule_linear = nn.Linear(gat_dim, 2 * in_dim)
         self.partner_linear = nn.Linear(gat_dim + fc_out_dim, 2 * in_dim)
-        self.loss_fn = torch.nn.GaussianNLLLoss()
+        self.loss_fn = torch.nn.GaussianNLLLoss(eps=1e-4)
         self.lr = lr
         self.mask_value = mask_value
 
@@ -147,6 +148,8 @@ class ImputationModule(L.LightningModule):
         partner_shape = list(partner_vec.shape)
         partner_shape[-1] = int(partner_shape[-1] / 2)
         partner_vec = partner_vec.reshape(*partner_shape, 2)
+        if mol_vec.isnan().any().item() or partner_vec.isnan().any().item():
+            print('nan prediction')
         return mol_vec, partner_vec
 
     def compute_loss(self, graph, partner_loss: bool = True) -> torch.tensor:
@@ -172,29 +175,39 @@ class ImputationModule(L.LightningModule):
         mol_vec, partner_vec = self(graph)
         mol_pred = mol_vec[molecule_mask][:, 0]
         partner_pred = partner_vec[partner_mask][:, 0]
+        var_cap = torch.tensor([10], device=partner_vec.device, dtype=partner_vec.dtype)
+        #print((torch.exp(partner_vec[partner_mask][:, 1])>10).sum().item())
+        #print((torch.exp(mol_vec[molecule_mask][:, 1])>10).sum().item())
         partner_var = torch.exp(partner_vec[partner_mask][:, 1])
+        #partner_vec = torch.min(partner_vec, var_cap)
         mol_var = torch.exp(mol_vec[molecule_mask][:, 1])
+        #mol_vec = torch.min(mol_vec, var_cap)
         # loss = torch.nn.functional.mse_loss(output, inputs.mean(dim=-1, keepdim=True))
-        self.log("num_masked_molecule", num_masked_molecule.item())
-        self.log("num_masked_partner", num_masked_partner.item())
+        self.log("num_masked_molecule", num_masked_molecule.item(), on_step=False, on_epoch=True, batch_size=1)
+        self.log("num_masked_partner", num_masked_partner.item(), on_step=False, on_epoch=True, batch_size=1)
         molecule_loss_coefficient = 1
         partner_loss_coefficient = 1
         loss = molecule_loss_coefficient * self.loss_fn(
             mol_pred, target=mol_target, var=mol_var
-        ) 
-        self.log("molecule_loss", loss.item())
+        )
+        self.log("molecule_loss", loss.item(), on_step=False, on_epoch=True, batch_size=1)
         if partner_loss and partner_loss_coefficient > 0:
             partner_loss = partner_loss_coefficient * self.loss_fn(
                 partner_pred, target=partner_target, var=partner_var
             )
             loss += partner_loss
-            self.log("partner_loss", partner_loss.item())
+            self.log("partner_loss", partner_loss.item(), on_step=False, on_epoch=True, batch_size=1)
+        loss_thresh = torch.max(partner_target.max(), mol_target.max())
+        if loss.item() > loss_thresh.item():
+            print(f"attention exploding loss: {loss.item()}")
+        loss = torch.min(loss, torch.max(partner_target.max(), mol_target.max()))
+        #print(loss.item())
         return loss
 
     def training_step(self, graph, batch_idx):
         loss = self.compute_loss(graph)
         # loss = torch.nn.functional.mse_loss(output[mask], gt[mask])
-        self.log("train_loss", loss.item())
+        self.log("train_loss", loss.item(), on_step=False, on_epoch=True, batch_size=1)
         # self.log('target_mean', target.mean().item())
         # self.log('target_std', target.std().item())
         # self.log('pred_mean', pred.mean().item())
@@ -314,7 +327,6 @@ def impute_heterogeneous_gnn(
     partner_mask_ids = ds.values[partner_molecule]["abundance"]
     partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(mapping_df.index.get_level_values(partner_molecule).unique())]
     partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
-    import random
     if masking_seed is None:
         masking_seed = random.randint(0, 1000000000)
     print(f"seed: {masking_seed}")
@@ -392,7 +404,7 @@ def impute_heterogeneous_gnn(
         # molecule_loss_coefficent=molecule_coefficient,
         # partner_loss_coefficent=partner_coefficient,
         dropout=0.1,
-        lr=0.01,
+        lr=0.001,
         num_embeddings=num_embeddings,
         embedding_dim=max(4, ds.num_samples // 2),
     )
@@ -400,11 +412,12 @@ def impute_heterogeneous_gnn(
         logger = ConsoleLogger()
     trainer = L.Trainer(
         logger=logger,
-        log_every_n_steps=log_every_n_steps,
+        log_every_n_steps=1,
         check_val_every_n_epoch=validation_frequency,
         max_epochs=max_epochs,
         enable_checkpointing=False,
         callbacks=[TrainingEarlyStopping(monitor="train_loss", mode="min", patience=early_stopping_patience)],
+        gradient_clip_val=1,
     )
     trainer.fit(model=model, train_dataloaders=train_dl)#, val_dataloaders=validation_dl)
 
