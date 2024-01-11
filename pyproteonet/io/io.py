@@ -1,11 +1,9 @@
-from typing import List, Optional, Callable, Union, Tuple, Dict
-import warnings
+from typing import List, Optional, Union, Tuple, Dict
 
 import numpy as np
 import pandas as pd
 
 # from ..utils import load_external_data
-from ..data.dataset_sample import DatasetSample
 from ..data.dataset import Dataset
 from ..data.molecule_set import MoleculeSet
 

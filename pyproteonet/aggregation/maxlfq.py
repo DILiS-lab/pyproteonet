@@ -236,7 +236,25 @@ def quantify_groups(groupings, minimum_subgroups, min_ratios: int, median_fallba
 
 
 def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, min_subgroups: int = 1, min_ratios: int = 1, median_fallback: bool = True,
-           is_log: bool = False, only_unique: bool = True, result_column: Optional[str] = None, pbar: bool = False):
+           is_log: bool = False, only_unique: bool = True, result_column: Optional[str] = None, pbar: bool = False)->pd.Series:
+    """Runs MaxLFQ aggregation on the dataset.
+
+    Args:
+        dataset (Dataset): Dataset to run aggregation on.
+        molecule (str): The molecule values should be aggregated for (e.g. protein).
+        mapping (str): Either the name of the aggregated molecule (e.g. peptide) or the name of the mapping linking the molecule from above to a partner molecule (e.g. peptide-protein mapping)
+        partner_column (str): The columns of the partner molecule containing abundance values that should be aggregated.
+        min_subgroups (int, optional): Minimum number of partner molecules required otherwise the aggregation result is set to NaN. Defaults to 1.
+        min_ratios (int, optional): Minimum number of ratios rquired to generate an aggregated value, otherwise the aggregating result is set to NaN. Defaults to 1.
+        median_fallback (bool, optional): Fallback to median abundance values if no ratios can be inferred. Defaults to True.
+        is_log (bool, optional): Wheter the input values are logarithmized. Defaults to False.
+        only_unique (bool, optional): Only consider unique peptides and ignore shared peptides. Defaults to True.
+        result_column (Optional[str], optional): If given aggregation results are stored in this alue column of the molecule. Defaults to None.
+        pbar (bool, optional): Wheter to display a progress bar. Defaults to False.
+
+    Returns:
+        pd.Series: A pandas series with sample id and molecule id as multiindex containing the aggregated values.
+    """
     mapped = dataset.molecule_set.get_mapped(molecule=molecule, mapping=mapping)
     molecule, mapping, partner = dataset.infer_mapping(molecule=molecule, mapping=mapping)
     degs = dataset.molecule_set.get_mapping_degrees(molecule=partner, mapping=mapping)
@@ -249,7 +267,7 @@ def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, m
     if not is_log:
         mat = np.log(mat)
     groupings_dict = {mol:np.ascontiguousarray(mat.loc[partner_ids.index.get_level_values(partner),:].to_numpy().astype(float))
-                    for mol,partner_ids in mapped.groupby(molecule)}
+                      for mol,partner_ids in mapped.groupby(molecule)}
     groupings = numba.typed.List()
     group_ids = []
     for key, group in groupings_dict.items():

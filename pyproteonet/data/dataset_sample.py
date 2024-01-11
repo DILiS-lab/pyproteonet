@@ -1,11 +1,18 @@
-from typing import Dict, Literal, TYPE_CHECKING, Callable, Optional, Iterable, List, Union
+from typing import (
+    Dict,
+    Literal,
+    TYPE_CHECKING,
+    Callable,
+    Optional,
+    Iterable,
+    List,
+    Union,
+)
 
 import pandas as pd
 import numpy as np
 import seaborn as sbn
 from matplotlib import pyplot as plt
-from pathlib import Path
-from pandas import HDFStore
 
 from ..dgl.graph_creation import populate_graph_dgl
 from .molecule_set import MoleculeSet
@@ -17,21 +24,25 @@ if TYPE_CHECKING:
 
 
 class DatasetSample:
+    """
+    Representing a dataset samples holding a set of values for every molecule. Can be thought of as a dictionary of pandas dataframes with one dataframe for each molecule.
+    """
+
     def __init__(self, dataset: "Dataset", values: Dict[str, pd.DataFrame], name: str):
         self.dataset = dataset
         self.values = values
         self.name = name
-        # self._node_mapping = None
-        # self._nodes = None
-        # self._edges = None
 
     def get_index_for(self, molecule_type: Literal["peptide", "protein", "mRNA"]):
         return self.molecules[molecule_type].index
 
-    # def create_graph_nodes_edges(self):
-    #     return self.molecule_set.create_graph_nodes_edges()
-
-    def copy(self, columns: Optional[Union[Iterable[str],Dict[str, Union[str, Iterable[str]]]]] = None, molecule_ids: Dict[str, pd.Index] = {}):
+    def copy(
+        self,
+        columns: Optional[
+            Union[Iterable[str], Dict[str, Union[str, Iterable[str]]]]
+        ] = None,
+        molecule_ids: Dict[str, pd.Index] = {},
+    ):
         new_values = {}
         for molecule, df in self.values.items():
             if isinstance(columns, dict):
@@ -87,19 +98,9 @@ class DatasetSample:
     def molecules(self):
         return self.molecule_set.molecules
 
-    # @property
-    # def nodes(self):
-    #     return self.molecule_set.nodes
-
-    # @property
-    # def edges(self):
-    #     return self.molecule_set.edges
-
-    # @property
-    # def node_mapping(self):
-    #     return self.molecule_set.node_mapping
-
-    def get_node_values_for_graph(self, graph: MoleculeGraph, include_id_and_type: bool = True):
+    def get_node_values_for_graph(
+        self, graph: MoleculeGraph, include_id_and_type: bool = True
+    ):
         node_values = []
         for node_type, df in graph.nodes.groupby("type"):
             key = graph.inverse_type_mapping[node_type]  # type: ignore
@@ -107,7 +108,9 @@ class DatasetSample:
             columns = list(values.columns)
             df.loc[:, columns] = self.dataset.missing_value
             mask = df.molecule_id.isin(values.index)
-            df.loc[mask, columns] = values.loc[df.loc[mask, "molecule_id"], columns].to_numpy()
+            df.loc[mask, columns] = values.loc[
+                df.loc[mask, "molecule_id"], columns
+            ].to_numpy()
             if include_id_and_type:
                 node_values.append(df)
             else:
@@ -115,18 +118,13 @@ class DatasetSample:
         node_values = pd.concat(node_values)
         return node_values
 
-    # def create_graph_dgl(self):
-    #     graph = self.molecule_set.create_graph_dgl()
-    #     self.populate_graph_dgl(graph)
-    #     return graph
-
     def populate_graph_dgl(
         self,
         dgl_graph,
         mapping: str = "gene",
         value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
         molecule_columns: List[str] = [],
-        target_column: str = 'abundance',
+        target_column: str = "abundance",
         missing_column_value: Optional[float] = None,
     ):
         populate_graph_dgl(
@@ -136,10 +134,15 @@ class DatasetSample:
             feature_columns=value_columns,
             molecule_columns=molecule_columns,
             target_column=target_column,
-            missing_column_value=missing_column_value
+            missing_column_value=missing_column_value,
         )
 
-    def get_values(self, molecule: str, column: str = 'abundance', return_missing_mask: bool = False):
+    def get_values(
+        self,
+        molecule: str,
+        column: str = "abundance",
+        return_missing_mask: bool = False,
+    ):
         values = self.values[molecule][column].to_numpy()
         if return_missing_mask:
             return values, self.missing_mask(molecule=molecule, column=column)

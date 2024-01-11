@@ -73,6 +73,7 @@ def map_protein_sequence(
 
 def num_theoretical_peptides(
     molecule_set: MoleculeSet,
+    protein_molecule: str = "protein",
     sequence_column: str = "sequence",
     enzyme: str = "Trypsin",
     min_peptide_length: int = 7,
@@ -81,7 +82,7 @@ def num_theoretical_peptides(
 ) -> pd.Series:
     if "protein" not in molecule_set.molecules:
         raise KeyError("The MoleculeSet must contain proteins!")
-    sequences = molecule_set.molecules["protein"][sequence_column]
+    sequences = molecule_set.molecules[protein_molecule][sequence_column]
     digestor = ProteaseDigestion()
     digestor.setEnzyme(enzyme)
     num_peps = []
@@ -90,8 +91,8 @@ def num_theoretical_peptides(
         digestor.digest(AASequence().fromString(sequence), res, min_peptide_length, max_peptide_length)
         num_peps.append(len(set(res)))
     if result_column is not None:
-        molecule_set.molecules['protein'][result_column] = num_peps
-        return molecule_set.molecules['protein'][result_column]
+        molecule_set.molecules[protein_molecule][result_column] = num_peps
+        return molecule_set.molecules[protein_molecule][result_column]
     else:
         return pd.Series(num_peps, index=sequences.index)
 
