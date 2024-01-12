@@ -2,14 +2,10 @@ from typing import Any, Dict, Tuple, Callable, List, Iterable, Optional, Union
 from collections import OrderedDict
 import glob
 import shutil
-import copy
 
 import numpy as np
 import pandas as pd
 from pandas import HDFStore
-from matplotlib import pyplot as plt
-import seaborn as sbn
-from scipy.stats import pearsonr  # type: ignore
 from pathlib import Path
 import json
 
@@ -69,7 +65,15 @@ class Dataset:
         self._dgl_graph = None
 
     @classmethod
-    def load(cls, dir_path: Union[str, Path]):
+    def load(cls, dir_path: Union[str, Path])->"Dataset":
+        """loads a previsously saved dataset from disk
+
+        Args:
+            dir_path (Union[str, Path]): path to the directory representing the dataset
+
+        Returns:
+            Dataset: the loaded dataset
+        """
         dir_path = Path(dir_path)
         molecule_set = MoleculeSet.load(dir_path / "molecule_set.h5")
         missing_value = np.nan
@@ -98,9 +102,25 @@ class Dataset:
         result_column_name: str = "abundance",
         mapping_column: Optional[str] = None,
         mapping_sep: str = ",",
-        mapping_molecule: str = "protein",
+        partner_molecule: str = "protein",
         mapping_name="peptide-protein",
     ) -> "Dataset":
+        """Transforming a pandas dataframe into a dataset. Useful for loading tabular peptide abundance data with a mapping column mapping peptides to proteins.
+
+        Args:
+            df (pd.DataFrame): The dataframe containing the data.
+            molecule (str): The molecule whose values are contained in the dataframe.
+            sample_columns (List[str]): The list of columns representing the dataset samples
+            id_column (Optional[str], optional): The name of the column representing molecule ids. If none the dataframe index is used. Defaults to None.
+            result_column_name (str, optional): Name of the value column used for the loaded values. Defaults to "abundance".
+            mapping_column (Optional[str], optional): Column containing lists of partner molecule ids. Defaults to None.
+            mapping_sep (str, optional): The seperator character used to separed partner molecuel ids. Defaults to ",".
+            mapping_molecule (str, optional): The name of the partner molecule type. Defaults to "protein".
+            mapping_name (str, optional): The name of the mapping created from the mapping_column. Defaults to "peptide-protein".
+
+        Returns:
+            Dataset: the loaded dataset.
+        """
         from ..io.io import read_mapped_dataframe
         return read_mapped_dataframe(
             df=df,
@@ -110,11 +130,20 @@ class Dataset:
             result_column_name=result_column_name,
             mapping_column=mapping_column,
             mapping_sep=mapping_sep,
-            mapping_molecule=mapping_molecule,
+            mapping_molecule=partner_molecule,
             mapping_name=mapping_name,
         )
 
     def save(self, dir_path: Union[str, Path], overwrite: bool = False):
+        """Saves the dataset to disk as a directory containing .h5 files for the samples and a .h5 file for the molecule set.
+
+        Args:
+            dir_path (Union[str, Path]): Directory path to save the dataset to.
+            overwrite (bool, optional): Wheter to overwrite any existing data. Defaults to False.
+
+        Raises:
+            FileExistsError: Raised if the directory already exists and overwrite is False.
+        """
         dir_path = Path(dir_path)
         dir_path.mkdir(parents=True, exist_ok=overwrite)
         samples_dir = dir_path / "samples"
@@ -141,6 +170,16 @@ class Dataset:
         index_names: Optional[List[str]] = None,
         na_rep="NA",
     ):
+        """Write .tsv files for the given molecules and columns to the given directory.
+
+        Args:
+            output_dir (Path): The output directory path.
+            molecules (List[str], optional): The molecules whose columns should be written to .tsv files. Defaults to ["protein", "peptide"].
+            columns (List[&quot;str&quot;], optional): The column to write. Every column produces a .tsv file the with column values for every samples. Defaults to ["abundance"].
+            molecule_columns (Union[bool, List[str]], optional): Any columns from the MoleculeSet to add to the .tsv files. Defaults to [].
+            index_names (Optional[List[str]], optional): How to name the index columns in the .tsv files. Defaults to None.
+            na_rep (str, optional): How to represent missing (NaN) values in the .tsv files. Defaults to "NA".
+        """
         output_dir.mkdir(parents=True, exist_ok=True)
         if index_names is None:
             index_names = molecules
@@ -162,6 +201,15 @@ class Dataset:
         return self.samples_dict[sample_name]
 
     def create_sample(self, name: str, values: Dict[str, pd.DataFrame]):
+        """Add a new sample to the dataset.
+
+        Args:
+            name (str): The name of the sample to add.
+            values (Dict[str, pd.DataFrame]): The values for the sample. The keys are the molecule types and the values are dataframes with the molecule ids as index and the values as columns.
+
+        Raises:
+            ValueError: Raised if index of the given dataframes does not align with the molecule ids of the dataset.
+        """
         if name in self.samples_dict:
             KeyError(f"Sample with name {name} already exists.")
         for mol, mol_df in self.molecules.items():
@@ -207,6 +255,14 @@ class Dataset:
         return self.molecule_set.mappings
 
     def number_molecules(self, molecule: str) -> int:
+        """The number of molecules for a given molecule type.
+
+        Args:
+            molecule (str): The molecule type to get the number of molecules for (e.g. protein, peptide ...)
+
+        Returns:
+            int: The number of molecules.
+        """
         return self.molecule_set.number_molecules(molecule=molecule)
 
     def __len__(self) -> int:
@@ -216,6 +272,14 @@ class Dataset:
         return self.samples
 
     def sample_apply(self, fn: Callable, *args, **kwargs):
+        """Apply a function for every dataset samples
+
+        Args:
+            fn (Callable): The function to apply.
+
+        Returns:
+            _type_: The transformed dataset.
+        """
         transformed = {}
         for key, sample in self.samples_dict.items():
             transformed[key] = fn(sample, *args, **kwargs)
@@ -230,6 +294,17 @@ class Dataset:
         copy_molecule_set: bool = True,
         molecule_ids: Dict[str, pd.Index] = {},
     ):
+        """Copies the dataset.
+
+        Args:
+            samples (Optional[List[str]], optional): Dataset samples to include in the copy (all samples if not given). Defaults to None.
+            columns (Optional[ Union[Iterable[str], Dict[str, Union[str, Iterable[str]]]] ], optional): Which value columns to copy for every molecule. Defaults to None.
+            copy_molecule_set (bool, optional): Wheter to copy the MoleculeSet or just store a reference to the original MoleculeSet. Defaults to True.
+            molecule_ids (Dict[str, pd.Index], optional): Which molecule ids to copy for every molecule type (all molecule ids are copied if a molecule type is not specified). Defaults to {}.
+
+        Returns:
+            _type_: _description_
+        """
         copied = {}
         samples_dict = self.samples_dict
         if samples is None:
@@ -243,25 +318,16 @@ class Dataset:
         return Dataset(molecule_set=molecule_set, samples=copied)
 
     def get_molecule_subset(self, molecule: str, ids: pd.Index):
-        return self.copy(molecule_ids={molecule: ids}, copy_molecule_set=True)
+        """Create a new dataset containing only the given molecule ids for the given molecule type.
 
-    def all_values(
-        self,
-        molecule: str,
-        column: str = "abundance",
-        return_missing_mask: bool = False,
-    ):
-        values = []
-        mask = []
-        for sample in self.samples_dict.values():
-            v = sample.values[molecule][column]
-            values.append(v)
-            if return_missing_mask:
-                mask.append(eq_nan(v, sample.missing_value))
-        values = pd.concat(values)
-        if return_missing_mask:
-            return values, np.concatenate(mask)
-        return values
+        Args:
+            molecule (str): The molecule type to copy
+            ids (pd.Index): The molecule ids to copy
+
+        Returns:
+            Dataset: A new dataset containing the specified subset of the old dataset
+        """
+        return self.copy(molecule_ids={molecule: ids}, copy_molecule_set=True)
 
     def lf(
         self,
@@ -269,11 +335,30 @@ class Dataset:
         columns: Optional[List[str]] = None,
         molecule_columns: List[str] = [],
     ):
+        """Returns a dataframe in long format with multindex (sample id, molecule id) representing the value columns for the specified molecule type.
+
+        Args:
+            molecule (str): The molecule type (e.g. protein, peptide ...)
+            columns (Optional[List[str]], optional): The value columns to include in the result, default to all vall columns. Defaults to None.
+            molecule_columns (List[str], optional): Any molecule columns from the MoleculeSet to include in the resulting dataframe. Defaults to [].
+
+        Returns:
+            pd.DataFrame: the resulting dataframe
+        """
         return self.get_values_flat(
             molecule=molecule, columns=columns, molecule_columns=molecule_columns
         )
 
-    def wf(self, molecule: str, column: str):
+    def wf(self, molecule: str, column: str)->pd.DataFrame:
+        """Returns a dataframe in wide format (molecule ids as index, sample names as columns) representing the values of the specified value column for the specified molecule type.
+
+        Args:
+            molecule (str): The molecule type (e.g. protein, peptide ...)
+            column (Optional[List[str]], optional): The value column to use.
+
+        Returns:
+            pd.DataFrame: the resulting dataframe
+        """
         return self.get_samples_value_matrix(molecule=molecule, column=column)
 
     def get_values_flat(
@@ -281,7 +366,17 @@ class Dataset:
         molecule: str,
         columns: Optional[List[str]] = None,
         molecule_columns: List[str] = [],
-    ):
+    )->pd.DataFrame:
+        """Returns a dataframe in long format with multindex (sample id, molecule id) representing the value columns for the specified molecule type.
+
+        Args:
+            molecule (str): The molecule type (e.g. protein, peptide ...)
+            columns (Optional[List[str]], optional): The value columns to include in the result, default to all vall columns. Defaults to None.
+            molecule_columns (List[str], optional): Any molecule columns from the MoleculeSet to include in the resulting dataframe. Defaults to [].
+
+        Returns:
+            pd.DataFrame: the resulting dataframe
+        """
         sample_names, df = [], []
         for name, sample in self.samples_dict.items():
             if columns is None:
@@ -303,16 +398,33 @@ class Dataset:
         return df
 
     def infer_mapping(self, molecule: str, mapping: str) -> Tuple[str, str, str]:
+        """Infer a mapping name from a molecule type and a mapping string.
+
+        Args:
+            molecule (str): Molecule type like protein, peptide ...
+            mapping (str): If the name of a molecule type is given it is tried to infer the mapping name connecting both molecule types. If a mapping name is given it is returned as is.
+
+        Returns:
+            Tuple[str, str, str]: The from molecule type, the mapping name, and the to molecule type.
+        """
         return self.molecule_set.infer_mapping(molecule=molecule, mapping=mapping)
 
     def get_mapping_partner(self, molecule: str, mapping: str) -> str:
+        """Infer the partner molecule type for a molecule type and mapping
+
+        Args:
+            molecule (str): The one molecule type of the mapping
+            mapping (str): The mapping name.
+
+        Returns:
+            str: The other molecule type of the mapping.
+        """
         return self.molecule_set.get_mapping_partner(molecule=molecule, mapping=mapping)
 
     def get_mapped(
         self,
         molecule: str,
         mapping: str,
-        partner_molecule: str = None,
         columns: Union[str, List[str]] = [],
         samples: Optional[List] = None,
         partner_columns: Union[str, List[str]] = [],
@@ -320,6 +432,21 @@ class Dataset:
         molecule_columns_partner: Union[str, List[str]] = [],
         return_partner_index_name: bool = False,
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
+        """Return a dataframe containing all pairs of molecules connected by the given mapping with the values for the corresponding value columns.
+
+        Args:
+            molecule (str): A molecule type like protein, peptide...
+            mapping (str): A mapping name.
+            columns (Union[str, List[str]], optional): The value columns of the given molecule type to include in the results. Defaults to [].
+            samples (Optional[List], optional): The names of the samples to include in the results. Defaults to None.
+            partner_columns (Union[str, List[str]], optional): The value columns of the partner molecule type to include. Defaults to [].
+            molecule_columns (Union[str, List[str]], optional): Any molecule columns from the MoleculeSet to include for the given molecule. Defaults to [].
+            molecule_columns_partner (Union[str, List[str]], optional): Any molecule columns from the MoleculeSet to include for the given partner molecule. Defaults to [].
+            return_partner_index_name (bool, optional): Whether to return the name of the partner index. Defaults to False.
+
+        Returns:
+            Union[pd.DataFrame, Tuple[pd.DataFrame, str]]: the resulting dataframe and an optinal partner index name.
+        """
         if isinstance(columns, str):
             columns = [columns]
         if isinstance(partner_columns, str):
@@ -332,15 +459,14 @@ class Dataset:
         #    raise AttributeError("The list of columns needs to contain at least one column!")
         mapping = self.molecule_set.get_mapping(
             molecule=molecule,
-            partner_molecule=partner_molecule,
             mapping_name=mapping,
             molecule_columns=molecule_columns,
             partner_columns=molecule_columns_partner,
         )
-        if partner_molecule is None:
+        # if partner_molecule is None:
             # partner_molecule = [n for n in mapping.mapping_molecules if n not in {'sample', molecule}]
             # assert len(partner_molecule) == 1
-            partner_molecule = mapping.mapping_molecules[1]
+        partner_molecule = mapping.mapping_molecules[1]
         cols = set(mapping.df.columns)
         if samples is None:
             samples = self.sample_names
@@ -395,7 +521,20 @@ class Dataset:
         ids: Optional[Iterable] = None,
         return_missing_mask: bool = False,
         drop_sample_id: bool = False,
-    ):
+    )->pd.Series:
+        """Returns a single value columns as a pandas Series with a MultiIndex with the levels: "id" (molecule id) and "sample"
+
+        Args:
+            molecule (str): The molecule type to get the values for.
+            column (str, optional): The value column to get the values for. Defaults to "abundance".
+            samples (Optional[List[str]], optional): The name of the samples to consider or None to consider all samples. Defaults to None.
+            ids (Optional[Iterable], optional): The molecule ids to consider. Defaults to None.
+            return_missing_mask (bool, optional): Whether to return a mask of missing values. Defaults to False.
+            drop_sample_id (bool, optional): Wheter to trop the sample id from the result's index. Defaults to False.
+
+        Returns:
+            pd.Series: The resulting pandas Series.
+        """
         vals = self.get_samples_value_matrix(
             molecule=molecule,
             column=column,
@@ -410,14 +549,6 @@ class Dataset:
             return vals, eq_nan(vals, self.missing_value)
         else:
             return vals
-
-    def missing_mask(self, molecule: str, column: str = "abundance"):
-        return eq_nan(
-            self.get_column_flat(molecule=molecule, column=column), self.missing_value
-        )
-
-    def non_missing_mask(self, molecule: str, column: str = "abundance"):
-        return ~self.missing_mask(molecule=molecule, column=column)
 
     def set_column_flat(
         self,
@@ -463,7 +594,19 @@ class Dataset:
         molecule_columns: Union[bool, List[str]] = [],
         samples: Optional[List[str]] = None,
         ids: Optional[Iterable] = None,
-    ):
+    )->pd.DataFrame:
+        """Returns a dataframe in wide format (molecule ids as index, sample names as columns) representing the values of the specified value column for the specified molecule type.
+
+        Args:
+            molecule (str): The molecule type (e.g. protein, peptide ...)
+            column (Optional[List[str]], optional): The value column to use.
+            molecule_columns (Union[bool, List[str]], optional): Any molecule columns from the MoleculeSet to include in the resulting dataframe. Defaults to [].
+            samples (Optional[List[str]], optional): The names of the samples to consider for the genrated result. Defaults to None.
+            ids (Optional[Iterable], optional): The molecule ids to consider for the generated result. Defaults to None.
+
+        Returns:
+            pd.DataFrame: the resulting dataframe
+        """
         if samples is None:
             samples = self.sample_names
         if molecule_columns:
@@ -488,11 +631,29 @@ class Dataset:
     def set_samples_value_matrix(
         self, matrix: pd.DataFrame, molecule: str, column: str = "abundance"
     ):
+        """Sets a dataframe in wide format (molecule ids as index, sample names as columns) for the values of the given value column for the given molecule type.
+
+        Args:
+            molecule (str): The molecule type (e.g. protein, peptide ...)
+            column (Optional[List[str]], optional): The name of the value column to store the result in.
+            
+        Returns:
+            pd.DataFrame: the resulting dataframe
+        """
         for sample_name, sample in self.samples_dict.items():
             if sample_name in matrix.keys():
                 sample.values[molecule][column] = matrix[sample_name]
 
     def rename_molecule(self, molecule: str, new_name: str):
+        """Rename a molecule type.
+
+        Args:
+            molecule (str): The current name.
+            new_name (str): The new name.
+
+        Raises:
+            KeyError: Raised when the new name already exists.
+        """
         if new_name in self.values:
             raise KeyError(f"{new_name} already exists in values.")
         molecule_values = self.values[molecule]
@@ -505,11 +666,26 @@ class Dataset:
         self.molecule_set.rename_molecule(molecule=molecule, new_name=new_name)
 
     def rename_mapping(self, mapping: str, new_name: str):
+        """Rename a mapping.
+
+        Args:
+            mapping (str): The old name of the mapping.
+            new_name (str): The new name of the mapping.
+        """
         self.molecule_set.rename_mapping(mapping=mapping, new_name=new_name)
 
     def rename_columns(
         self, columns: Dict[str, Dict[str, str]], inplace: bool = False
     ) -> Optional["Dataset"]:
+        """Rename one or several value columns.
+
+        Args:
+            columns (Dict[str, Dict[str, str]]): A dictionary mapping old to new column names for every molecule type (protein, peptide etc.)
+            inplace (bool, optional): Whether to perform the operation inplace or return a copy. Defaults to False.
+
+        Returns:
+            Optional[Dataset]: A copy of the dataset with the renamed columns if inplace is False, otherwise None.
+        """
         return rename_columns(dataset=self, columns=columns, inplace=inplace)
 
     def rename_values(
@@ -518,6 +694,7 @@ class Dataset:
         molecules: Optional[List[str]] = None,
         inplace: bool = False,
     ):
+        """Similar to rename_columns but uses the same mapping for all molecule types."""
         return rename_values(
             data=self, columns=columns, molecules=molecules, inplace=inplace
         )
@@ -527,7 +704,17 @@ class Dataset:
         columns: List[str],
         molecules: Optional[List[str]] = None,
         inplace: bool = False,
-    ):
+    )->Optional["Dataset"]:
+        """Drop one or several value columns.
+
+        Args:
+            columns (List[str]): The columns to drop.
+            molecules (Optional[List[str]], optional): The molecules for which the given columns are dropped if they exist. Defaults to None.
+            inplace (bool, optional): Whether to return a new dataset. Defaults to False.
+
+        Returns:
+            _type_: The resulting dataset if inplace is False, otherwise None.
+        """
         return drop_values(
             data=self, columns=columns, molecules=molecules, inplace=inplace
         )
@@ -541,6 +728,22 @@ class Dataset:
         features_to_float32: bool = True,
         samples: Optional[List[str]] = None,
     ) -> "dgl.DGLHeteroGraph":
+        """Transform the dataset into a dgl graph.
+
+        Args:
+            feature_columns (Dict[str, Union[str, List[str]]]): value columns to include as features for the nodes of the graph.
+            mappings (Union[str, List[str]]): Names of the mappings to use for the edges of the graph.
+            mapping_directions (Dict[str, Tuple[str, str]], optional): Used to specifies the direction of edges between molecule types. Defaults to {}.
+            make_bidirectional (bool, optional): Whether to make the graph edges bidirectional. Defaults to False.
+            features_to_float32 (bool, optional): Cast all feature values to float32. Defaults to True.
+            samples (Optional[List[str]], optional): The names of the samples to include in the graph. If not given all samples are included. Defaults to None.
+
+        Raises:
+            KeyError: Raised if feature columns with the reserved names 'hidden' and 'mask' are specified
+
+        Returns:
+            dgl.DGLHeteroGraph: the created graph
+        """
         import dgl
         import torch
         if samples is None:
@@ -600,46 +803,21 @@ class Dataset:
         #             res.nodes[mol].data[feature] = sample_mat
         return g
 
-    def create_graph(
-        self, mapping: str = "gene", bidirectional: bool = True, cache: bool = True
-    ):
-        return self.molecule_set.create_graph(
-            mapping=mapping, bidirectional=bidirectional, cache=cache
-        )
-
     def calculate_hist(
         self, molecule_name: str, bins="auto"
     ) -> Tuple[np.ndarray, np.ndarray]:
-        values, mask = self.all_values(molecule=molecule_name, return_missing_mask=True)
-        existing = values[~mask]
+        """Calculate a histogram for the values of a given molecule type.
+
+        Args:
+            molecule_name (str): The molecule type to generate the histogram for.
+            bins (str, optional): The bins. Defaults to "auto".
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: The histogram values.
+        """
+        values = self.values[molecule_name]
+        mask = ~values.isna()
+        existing = values[mask]
         bin_edges = np.histogram_bin_edges(existing, bins=bins)
         hist = np.histogram(values, bins=bin_edges)
         return hist
-
-    def plot_correlation(
-        self,
-        molecule: str,
-        column_x: str,
-        column_y: str,
-        samples: Optional[List[str]] = None,
-        ax=None,
-    ):
-        if ax is None:
-            fig, ax = plt.subplots()
-        if samples is None:
-            samples = self.sample_names
-
-        plot_df = []
-        missing = 0
-        for sample in samples:
-            sample = self[sample]
-            mask_gt = ~sample.missing_mask(molecule, column_x)
-            mask_prediction = ~sample.missing_mask(molecule, column_y)
-            mask = mask_gt & mask_prediction
-            missing += mask_prediction.sum() / self.molecules[molecule].shape[0]
-            plot_df.append(sample.values[molecule].loc[mask, [column_x, column_y]])
-        missing = missing / len(samples)
-        plot_df = pd.concat(plot_df, ignore_index=True)
-        sbn.regplot(x=column_x, y=column_y, data=plot_df, ax=ax)
-        r, p = pearsonr(plot_df[column_x], plot_df[column_y])
-        ax.set_title(f"R2:{round(r**2, 5)}, avg. coverage: {round(missing, 5)   }")

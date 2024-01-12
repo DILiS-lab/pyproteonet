@@ -7,7 +7,6 @@ from itertools import chain
 import pandas as pd
 from pandas import HDFStore
 
-from .graph_creation import create_graph_nodes_edges
 from .molecule_graph import MoleculeGraph
 
 
@@ -229,6 +228,15 @@ class MoleculeSet:
         return mapping
 
     def infer_mapping(self, molecule: str, mapping: str) -> Tuple[str, str, str]:
+        """Infer a mapping name from a molecule type and a mapping string.
+
+        Args:
+            molecule (str): Molecule type like protein, peptide ...
+            mapping (str): If the name of a molecule type is given it is tried to infer the mapping name connecting both molecule types. If a mapping name is given it is returned as is.
+
+        Returns:
+            Tuple[str, str, str]: The from molecule type, the mapping name, and the to molecule type.
+        """
         mapping = self.infer_mapping_name(molecule=molecule, mapping_name=mapping)
         partner = [
             n for n in self.mappings[mapping].mapping_molecules if n != molecule
@@ -250,6 +258,15 @@ class MoleculeSet:
         return mapping_name
 
     def get_mapping_partner(self, molecule: str, mapping: str) -> str:
+        """Infer the partner molecule type for a molecule type and mapping
+
+        Args:
+            molecule (str): The one molecule type of the mapping
+            mapping (str): The mapping name.
+
+        Returns:
+            str: The other molecule type of the mapping.
+        """
         return self.infer_mapping(molecule=molecule, mapping=mapping)
 
     def get_mapping(
@@ -329,7 +346,7 @@ class MoleculeSet:
         result_column: Optional[str] = None,
         partner_molecule: str = None,
         only_unique: bool = False,
-    ):
+    )->pd.Series:
         molecule, mapping, partner = self.infer_mapping(
             molecule=molecule, mapping=mapping
         )
@@ -379,6 +396,15 @@ class MoleculeSet:
         self.molecules[molecule][column] = data
 
     def rename_molecule(self, molecule: str, new_name: str):
+        """Rename a molecule type.
+
+        Args:
+            molecule (str): The current name.
+            new_name (str): The new name.
+
+        Raises:
+            KeyError: Raised when the new name already exists.
+        """
         if new_name in self.molecules:
             raise KeyError(f"Key {new_name} already exists.")
         self.molecules[new_name] = self.molecules[molecule]
@@ -476,25 +502,6 @@ class MoleculeSet:
             self.mappings[name].add_pairs(pairs)
             self.mappings[name].validate_for_molecule_set(self)
         self.clear_cache()
-
-    def create_graph(
-        self, mapping: str = "gene", bidirectional: bool = True, cache: bool = True
-    ) -> MoleculeGraph:
-        if cache and mapping in self.graphs:
-            return self.graphs[mapping]
-        nodes, edges, node_mapping, type_mapping = create_graph_nodes_edges(
-            molecule_set=self, mappings=[mapping], make_bidirectional=bidirectional
-        )
-        graph = MoleculeGraph(
-            nodes=nodes,
-            edges=edges,
-            node_mapping=node_mapping,
-            molecule_set=self,
-            type_mapping=type_mapping,
-        )
-        if cache:
-            self.graphs[mapping] = graph
-        return graph
 
     def get_node_values_for_graph(
         self,

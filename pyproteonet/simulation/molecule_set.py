@@ -14,6 +14,8 @@ from ..data.dataset import Dataset
 def molecule_set_from_degree_distribution(protein_degree_distribution: List[int] = [2, 5, 7, 7], peptide_degree_distribution: List[int] = [1, 20, 10],
                                           random_seed: Optional[int] = None)->MoleculeSet:
     rng = get_numpy_random_generator(seed=random_seed)
+    protein_degree_distribution = protein_degree_distribution.astype(int)
+    peptide_degree_distribution = peptide_degree_distribution.astype(int)
     num_prot_edges = (np.arange(len(protein_degree_distribution)) * protein_degree_distribution).sum()
     num_pep_edges = (np.arange(len(peptide_degree_distribution)) * peptide_degree_distribution).sum()
     if num_prot_edges != num_pep_edges:

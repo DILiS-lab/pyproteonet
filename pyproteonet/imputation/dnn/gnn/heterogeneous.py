@@ -18,7 +18,6 @@ from lightning.pytorch.loggers import Logger
 
 from ....data.dataset import Dataset
 from ....masking.masked_dataset_generator import MaskedDatasetGenerator
-from ....masking.random import mask_molecule_values_random_non_missing
 from ....lightning.console_logger import ConsoleLogger
 from ....lightning.training_early_stopping import TrainingEarlyStopping
 from ....normalization.dnn_normalizer import DnnNormalizer
@@ -33,8 +32,6 @@ class ImputationModule(L.LightningModule):
         mapping,
         in_dim,
         layers,
-        # molecule_loss_coefficent=1,
-        # partner_loss_coefficent=1,
         lr=0.1,
         dropout=0.2,
         gat_heads=10,
@@ -47,8 +44,6 @@ class ImputationModule(L.LightningModule):
         self.molecule = molecule
         self.partner_molecule = partner_molecule
         self.mapping = mapping
-        # self.molecule_loss_coefficent = molecule_loss_coefficent
-        # self.partner_loss_coefficent = partner_loss_coefficent
         self.etype = (partner_molecule, mapping, molecule)
         self.etype_inverse = (molecule, mapping, partner_molecule)
         dense_layers_partner = []
@@ -121,7 +116,6 @@ class ImputationModule(L.LightningModule):
         for key, ab in abundance.items():
             ab[torch.isnan(ab)] = self.mask_value
         partner_inputs = abundance[self.partner_molecule]
-        molecule_inputs = abundance[self.molecule]
         # if self.embedding is not None:
         #     molecule_inputs = torch.cat((self.embedding(graph.nodes(self.molecule).int()), molecule_inputs), dim=-1)
         partner_fc_vec = self.partner_fc_model(partner_inputs)
@@ -198,28 +192,15 @@ class ImputationModule(L.LightningModule):
             loss += partner_loss
             self.log("partner_loss", partner_loss.item(), on_step=False, on_epoch=True, batch_size=1)
         loss_thresh = torch.max(partner_target.max(), mol_target.max())
-        if loss.item() > loss_thresh.item():
-            print(f"attention exploding loss: {loss.item()}")
+        # if loss.item() > loss_thresh.item():
+        #     print(f"attention exploding loss: {loss.item()}")
         loss = torch.min(loss, torch.max(partner_target.max(), mol_target.max()))
         #print(loss.item())
         return loss
 
     def training_step(self, graph, batch_idx):
         loss = self.compute_loss(graph)
-        # loss = torch.nn.functional.mse_loss(output[mask], gt[mask])
         self.log("train_loss", loss.item(), on_step=False, on_epoch=True, batch_size=1)
-        # self.log('target_mean', target.mean().item())
-        # self.log('target_std', target.std().item())
-        # self.log('pred_mean', pred.mean().item())
-        # self.log('pred_std', pred.std().item())
-        # self.log('var_mean', var.mean().item())
-        # self.log('var_std', var.std().item())
-        # inputs = inputs.detach().cpu()
-        # inputs[inputs==-3] = np.nan
-        # self.log('mean_diff', torch.nanmean((torch.nanmean(inputs.detach().cpu(), axis=1) - output.detach().cpu())**2))
-        # output = output.detach().cpu().flatten()
-        # self.log('noisy_std', output[:200].mean())
-        # self.log('non_noisy_std', output[200:].mean())
         return loss
 
     def validation_step(self, graph, batch_idx):
@@ -249,19 +230,40 @@ def impute_heterogeneous_gnn(
     molecule_uncertainty_column: Optional[str] = None,
     partner_result_column: Optional[str] = None,
     partner_uncertainty_column: Optional[str] = None,
-    # molecule_coefficient: Optional[float]=None,
-    # partner_coefficient: Optional[float]=None,
     max_epochs: int = 5000,
     training_fraction: float = 0.25,
-    molecule_embedding_dim: Optional[int] = None,
     train_sample_wise: bool = False,
-    validation_frequency: int = 1,
     log_every_n_steps: Optional[int] = None,
-    early_stopping_patience: int = 5,
+    early_stopping_patience: int = 7,
     logger: Optional[Logger] = None,
-    epoch_size: int = 10,
+    epoch_size: int = 30,
     masking_seed: Optional[int] = None,
+    missing_substitute_value: int = -2
 ) -> pd.Series:
+    """Impute missing values using a homogenous graph neural network applied on the molecule graph created from two molecule types like proteins and their assigned peptides.
+
+    Args:
+        dataset (Dataset): The dataset to impute.
+        molecule (str): The main molecule type to impute (e.g. "protein").
+        column (str): The value column of the main molecule type to impute (e.g. "abundance").
+        mapping (str): The name of the mapping, connecting the main molecule type with a partner molecule type (e.g. "protein-peptide").
+        partner_column (str): The value column of the partner molecule type to impute.
+        molecule_result_column (Optional[str], optional): If given imputed values for the molecule are stored under this name. Defaults to None.
+        molecule_uncertainty_column (Optional[str], optional): If given predicted uncertainty values for the main molecule are stored under this name. Defaults to None.
+        partner_result_column (Optional[str], optional): If given imputed values for the partner molecule are stored under this name. Defaults to None.
+        partner_uncertainty_column (Optional[str], optional): If given predicted uncertainty values for the main molecule are stored under this name. Defaults to None.
+        max_epochs (int, optional): Maximum number of training epochs. Defaults to 5000.
+        training_fraction (float, optional): Mean fraction of molecules masked during training (The masking fraction for every epoch is randomly drawn from the (0.5 * training_fraction, 1.5 * training_fraction) interval). Defaults to 0.25.
+        train_sample_wise (bool, optional): Whether a training step operates only on a single sample or the whole dataset. Defaults to False.
+        log_every_n_steps (Optional[int], optional): How often to log during training. Defaults to None.
+        early_stopping_patience (int, optional): Number of epochs after which the training is stopped if the training loss does not improve. Defaults to 7.
+        logger (Optional[Logger], optional): The lightning logger used for logging. If not given logs will be printed to consose. Defaults to None.
+        epoch_size (int, optional): Number of training runs on the dataset that make up an epoch. Defaults to 30.
+        masking_seed (Optional[int], optional): If given this seed is used to seed the random generator for randomly masking molecule values during training. Defaults to None.
+        missing_substitute_value (float, optional): Value to replace missing or masked values with. Defaults to -3.
+    Returns:
+        pd.Series: the imputed values.
+    """
     molecule, mapping, partner_molecule = dataset.infer_mapping(
         molecule=molecule, mapping=mapping
     )
@@ -407,13 +409,14 @@ def impute_heterogeneous_gnn(
         lr=0.001,
         num_embeddings=num_embeddings,
         embedding_dim=max(4, ds.num_samples // 2),
+        mask_value=missing_substitute_value
     )
     if logger is None:
         logger = ConsoleLogger()
     trainer = L.Trainer(
         logger=logger,
         log_every_n_steps=1,
-        check_val_every_n_epoch=validation_frequency,
+        check_val_every_n_epoch=1,
         max_epochs=max_epochs,
         enable_checkpointing=False,
         callbacks=[TrainingEarlyStopping(monitor="train_loss", mode="min", patience=early_stopping_patience)],

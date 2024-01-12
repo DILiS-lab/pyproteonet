@@ -5,8 +5,24 @@ import pandas as pd
 
 from ..data.dataset import Dataset
 
-def across_sample_aggregate(dataset: Dataset, molecule: str, column: str, method: Literal['mean', 'median']='mean',
-                            all_missing_percentile: Optional[float] = None, all_missing_constant:float=0):
+def across_sample_aggregate_impute(dataset: Dataset, molecule: str, column: str, method: Literal['mean', 'median']='mean',
+                                   all_missing_percentile: Optional[float] = None, all_missing_constant:float=0):
+    """Aggregates across samples to impute missing values, if all values are missing for a given molecule, then imputes using a low percentile value.
+
+    Args:
+        dataset (Dataset): Dataset to imupute.
+        molecule (str): Molecule type to impute (e.g. protein, peptide etc.).
+        column (str): Value column with missing values to impute.
+        method (Literal[&#39;mean&#39;, &#39;median&#39;], optional): Across sample aggregation method. Defaults to 'mean'.
+        all_missing_percentile (Optional[float], optional): Percentile to use when all value are missing for a molecule. If not given a constant value is used. Defaults to None.
+        all_missing_constant (float, optional): Constant value to use when molecule is missing across all samples and no all missing percentile is given. Defaults to 0.
+
+    Raises:
+        AttributeError: _description_
+
+    Returns:
+        _type_: _description_
+    """
     method = method.lower()
     if method=='mean':
         fn = np.nanmean

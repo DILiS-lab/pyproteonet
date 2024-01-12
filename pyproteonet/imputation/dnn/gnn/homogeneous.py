@@ -2,6 +2,7 @@ from typing import List, Literal, Optional, Tuple
 from typing import List
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F
 import dgl
@@ -24,13 +25,6 @@ from dgl.dataloading import GraphCollator
 from ....data.dataset import Dataset
 from ....data.masked_dataset import MaskedDataset
 from ....masking.masked_dataset_generator import MaskedDatasetGenerator
-from ....masking.train_eval import (
-    train_eval_protein_and_mapped,
-    train_eval_full_protein_and_mapped,
-    train_eval_full_protein_and_mapped_backup,
-    train_eval_full_molecule,
-    train_eval_full_molecule_some_mapped,
-)
 from ....dgl.collate import (
     masked_dataset_to_homogeneous_graph,
     masked_heterograph_to_homogeneous,
@@ -233,19 +227,53 @@ def impute_homogeneous_gnn(
     partner_result_column: Optional[str] = None,
     max_epochs: int = 10000,
     validation_frequency: Optional[int] = None,
-    early_stopping_patience: int = 5,
+    early_stopping_patience: int = 7,
     missing_substitute_value: float = -3,
     use_gatv2: bool = True,
     mask_partner: bool = True,
     train_on_partner: bool = True,
     uncertainty_column: Optional[str] = None,
     logger: Optional[object] = None,
-    log_every_n_steps: int = 10,
+    log_every_n_steps: int = 30,
     embedding_dim: Optional[int] = None,
     train_sample_wise: bool = False,
     molecule_gt_column: Optional[str] = None,
     epoch_size: int = 1
-):
+)->pd.Series:
+    """Impute missing values using a homogenous graph neural network applied on the molecule graph created from two molecule types like proteins and their assigned peptides.
+
+    Args:
+        dataset (Dataset): The dataset to impute.
+        molecule (str): The main molecule type to impute (e.g. "protein").
+        column (str): The value column of the main molecule type to impute (e.g. "abundance").
+        mapping (str): The name of the mapping, connecting the main molecule type with a partner molecule type (e.g. "protein-peptide").
+        partner_column (str): The value column of the partner molecule type to impute.
+        training_fraction (float, optional): Mean fraction of molecules masked during training (The masking fraction for every epoch is randomly drawn from the (0.5 * training_fraction, 1.5 * training_fraction) interval). Defaults to 0.25.
+        feature_columns (Optional[List[str]], optional): Names of additional value columns to use as featues for the main molecule. Defaults to None.
+        partner_feature_columns (Optional[List[str]], optional): Names of additional value columns to use as featues for the partner molecule (should be the same number as for the main molecule to allow creation of a homogeneous graph). Defaults to None.
+        result_column (Optional[str], optional): If given, imputed results for the main molecule will be stored unders this name. Defaults to None.
+        partner_result_column (Optional[str], optional): If given, imputed results for the partner molecule will be stored under this name. Defaults to None.
+        max_epochs (int, optional): Maximum number of training epochs. Defaults to 10000.
+        validation_frequency (Optional[int], optional): If given validation is run every validation_frequency epochs. Defaults to None.
+        early_stopping_patience (int, optional): Number of epochs after which the training is stopped if the training loss does not improve. Defaults to 7.
+        missing_substitute_value (float, optional): Value to replace missing or masked values with. Defaults to -3.
+        use_gatv2 (bool, optional): Whether to use the DGL GATv2 graph attention layers or the original DLG GAT layers. Defaults to True.
+        mask_partner (bool, optional): Whether to randomly mask both the main and partner molecule during training or only the main molecules. Defaults to True.
+        train_on_partner (bool, optional): Whether to compute training loss on masked main and partner molecules or only on the main molecules. Defaults to True.
+        uncertainty_column (Optional[str], optional): Whether to predict an uncertainty value. Defaults to None.
+        logger (Optional[object], optional): If given this logger is used for logger (should have the lightning logger interface). Defaults to None.
+        log_every_n_steps (int, optional): How often to log. Defaults to 30.
+        embedding_dim (Optional[int], optional): If given every molecule will have a trainable embedding of this dimension. Defaults to None.
+        train_sample_wise (bool, optional): Whether a training step operates only on a single sample or the whole dataset. Defaults to False.
+        molecule_gt_column (Optional[str], optional): If given some metrics comparing predictions with ground truth values will be logged during training (helpful to evaluate training progress with respect to a ground truth). Defaults to None.
+        epoch_size (int, optional): Number of training runs on the dataset that make up an epoch. Defaults to 1.
+
+    Raises:
+        ValueError: Raised when main and partner molecule feature columns are not of the same length.
+
+    Returns:
+        pd.Series: The imputed values for the main molecule.
+    """
     molecule, mapping, partner_molecule = dataset.infer_mapping(
         molecule=molecule, mapping=mapping
     )

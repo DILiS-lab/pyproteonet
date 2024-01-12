@@ -33,8 +33,11 @@ for protein quantification and imputation.
 .. toctree:: 
    :caption: Python API
 
-   api/simulation
    api/data
+   api/simulation
+   api/aggregation
+   api/imputation
+   api/normalization
 
 
 Indices and tables

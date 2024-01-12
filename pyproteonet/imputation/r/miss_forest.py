@@ -21,7 +21,7 @@ if not robjects.r('"doRNG" %in% rownames(installed.packages())')[0]:
 do_rng = importr("doRNG")
 
 
-def impute_miss_forest(
+def miss_forest_impute(
     dataset: Dataset,
     molecule: str,
     column: str,
@@ -30,12 +30,25 @@ def impute_miss_forest(
     ntree=100,
     **kwds
 ):
+    """Impute using the MissForest method as implemented by the missForest R package which uses a random forest for missing value prediction. 
+
+    Args:
+        dataset (Dataset): Dataset to impute.
+        molecule (str): Molecule type to impute (e.g. protein, peptide etc.).
+        column (str): Name of the value column to impute.
+        result_column (Optional[str], optional): If given, name of the value column to store the imputed values in. Defaults to None.
+        molecules_as_variables (bool, optional): Whether to transpose the input matrix before imputation (treating molecules instead of samples as variables for the random forest). Defaults to True.
+        ntree (int, optional): Number of trees to use for the random forest. Defaults to 100.
+
+    Returns:
+        pd.Series: The imputed values.
+    """
     matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     mat = matrix.to_numpy()
     if molecules_as_variables:
         mat = mat.T
     mask = (np.isnan(mat).sum(axis=0) < mat.shape[0] - 1)#missForest requires at least two samples
-    #Enable multithreading
+    # TODO: multithreading does not seem to work at the moment, investigate this further
     # if proteins_as_variables:
     #     parallelize = 'variables'
     #     workers = min(multiprocessing.cpu_count(), ntree, mat.shape[1], 4)

@@ -8,11 +8,11 @@ import dgl
 from .dataset import Dataset
 from .dataset_sample import DatasetSample
 from .molecule_graph import MoleculeGraph
-from .abstract_masked_dataset import AbstractMaskedDataset
-from ..dgl.graph_key_dataset import GraphKeyDataset
 
 
-class MaskedDataset(AbstractMaskedDataset):
+class MaskedDataset():
+    """A dataset with some molecules masked. Used for self supervised training of predictive imputation models
+    """
     def __init__(
         self,
         dataset: Dataset,
@@ -135,23 +135,6 @@ class MaskedDataset(AbstractMaskedDataset):
             hidden_nodes = hidden_nodes.loc[hidden_nodes].index
             res.append(node_mapping.loc[hidden_nodes, "node_id"].to_numpy())  # type: ignore
         return np.concatenate(res)
-
-    def get_graph_dataset_dgl(
-        self,
-        mapping: str = "gene",
-        value_columns: Union[Dict[str, List[str]], List[str]] = ["abundance"],
-        molecule_columns: List[str] = [],
-        target_column: str = "abundance",
-        missing_column_value: Optional[float] = None,
-    ) -> GraphKeyDataset:
-        return GraphKeyDataset(
-            masked_dataset=self,
-            mapping=mapping,
-            value_columns=value_columns,
-            molecule_columns=molecule_columns,
-            target_column=target_column,
-            missing_column_value=missing_column_value,
-        )
 
     def to_dgl_graph(
         self,

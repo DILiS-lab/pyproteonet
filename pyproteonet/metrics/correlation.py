@@ -54,7 +54,6 @@ def across_sample_correlation(
     logarithmize: bool = True,
     correlation_measure: Callable = pearsonr,
 ) -> Dict[str, float]:
-    res = {}
     if molecule_ids is not None:
         molecule_ids = pd.Series(molecule_ids)
     val, val_mask = dataset.get_column_flat(molecule=molecule, column=column, return_missing_mask=True)

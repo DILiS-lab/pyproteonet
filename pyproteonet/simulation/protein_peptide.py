@@ -8,13 +8,12 @@ from ..data.dataset import Dataset
 from .sampling import draw_normal_log_space
 from .modification import per_molecule_random_scaling, introduce_random_condition
 from .random_error import multiply_exponential_gaussian, add_positive_gaussian, poisson_error
-from ..processing.aggregation import neighbor_sum
 from pyproteonet.aggregation.partner_summarization import partner_aggregation
 
 
 def simulate_protein_peptide_dataset(
     molecule_set: MoleculeSet,
-    mapping: str,
+    mapping: str = 'peptide-protein',
     samples: Union[int, List[str]] = 10,
     log_abundance_mu: float = 10,
     log_abundance_sigma: float = 2,
@@ -127,15 +126,14 @@ def simulate_protein_peptide_dataset(
         inplace=True,
         random_seed=seed,
     )
-    neighbor_sum(
-        dataset,
-        molecule=protein_molecule,
-        column=protein_column,
+    partner_aggregation(
+        dataset=dataset,
+        molecule=peptide_molecule,
+        partner_column=protein_column,
         mapping=mapping,
-        result_molecule=peptide_molecule,
+        method="sum",
         result_column=peptide_column,
         only_unique=False,
-        inplace=True,
     )
     if log_peptide_error_sigma != 0:
          multiply_exponential_gaussian(

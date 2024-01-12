@@ -146,8 +146,8 @@ def poisson_error(
         result_column = column
     rng = get_numpy_random_generator(seed=random_seed)
     for sample in dataset.samples:
-        vals, mask = sample.get_values(molecule=molecule, column=column, return_missing_mask=True)
-        mask = ~mask
+        vals = sample.values[molecule].loc[:, column]
+        mask = ~vals.isna()
         vals = vals[mask]
         sample.values[molecule].loc[mask, result_column] = rng.poisson(lam=vals)
     return dataset

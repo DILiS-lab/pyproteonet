@@ -4,3 +4,4 @@ from .random_error import add_positive_gaussian, poisson_error
 from .missing_values import simulate_mcars, simulate_mnars_thresholding
 from .protein_peptide import simulate_protein_peptide_dataset
 from .mock import ProteinPeptideDatasetMocker
+from .molecule_set import molecule_set_from_degree_distribution

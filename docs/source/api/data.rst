@@ -7,3 +7,5 @@ pyproteonet.data
    :recursive:
 
    pyproteonet.data.Dataset
+   pyproteonet.data.DatasetSample
+   pyproteonet.data.MoleculeSet

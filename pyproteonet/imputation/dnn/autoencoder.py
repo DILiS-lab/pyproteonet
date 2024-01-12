@@ -10,18 +10,35 @@ from ..vaep.sklearn.ae_transformer import AETransformer
 from ..vaep.sampling import sample_data
 
 
-def impute_auto_encoder(
+def auto_encoder_impute(
     dataset: Dataset,
     molecule: str,
     column: str,
     result_column: Optional[str] = None,
     validation_fraction: float = 0.1,
     batch_size: int = 26,
-    model_type: Literal["VAE", "DAE"] = "VAE",
+    model_type: Literal["VAE", "DAE"] = "DAE",
     hidden_layer_dimensions: List[int] = [512],
     latent_dimension: int = 50,
     cuda: Optional[bool] = None
 ) -> pd.DataFrame:
+    """Impute missing values using an autoencoder. Implementation based on PIMMS (https://github.com/RasmussenLab/pimms)
+
+    Args:
+        dataset (Dataset): Dataset to imputed.
+        molecule (str): Molecule type to impute (e.g. "protein" or "peptide").
+        column (str): Value column to impute.
+        result_column (Optional[str], optional): Value column to score the results in. Defaults to None.
+        validation_fraction (float, optional): Fraction of non-missing values used as validation set. Defaults to 0.1.
+        batch_size (int, optional): Batch size for training and prediction. Defaults to 26.
+        model_type (Literal[&quot;VAE&quot;, &quot;DAE&quot;], optional): "VAE" to use a variational autoencoder "DAE" to use a denoising autoencoder. Defaults to "DAE".
+        hidden_layer_dimensions (List[int], optional): Size of the hidden neurall network layer. Defaults to [512].
+        latent_dimension (int, optional): Size of the latent representation used for encoding/decoding each sammples. Defaults to 50.
+        cuda (Optional[bool], optional): Whether to run on the gpu/cuda. If not given cuda is chosen if available. Defaults to None.
+
+    Returns:
+        pd.Series: the imputed values.
+    """
     if cuda is None:
         cuda = torch.cuda.is_available()
     df = dataset.get_samples_value_matrix(molecule=molecule, column=column)

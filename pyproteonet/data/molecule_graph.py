@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 
 class MoleculeGraph:
+    """A graph representation of a molecule set.
+    """
 
     def __init__(self, nodes: pd.DataFrame, edges: pd.DataFrame, node_mapping: Dict[str, pd.DataFrame],
                   molecule_set: Optional[MoleculeSet], type_mapping: Dict[str, int]):
@@ -21,10 +23,6 @@ class MoleculeGraph:
         self.molecule_set = molecule_set
         self.type_mapping = type_mapping
         self.inverse_type_mapping =  {v:k for k,v in type_mapping.items()}
-
-    def to_dgl(self):
-        from ..dgl.graph_creation import create_graph_dgl
-        return create_graph_dgl(nodes=self.nodes, edges=self.edges)
 
     def get_node_degrees(self, molecule_type:str, outgoing:bool=True, incoming:bool=False)->pd.Series:
         edges = []

@@ -37,8 +37,24 @@ def impute_pca_method(
     result_column: Optional[str] = None,
     molecules_as_variables: bool = False,
     only_transform_missing: bool = True
-
 ):
+    """Apply any principal component analysis (PCA) related imputation function as implmented by the pcaMethods R package.
+       Available PCA imputation methods: svdPca, ppca, bpca, as well as svdImpute which is not a PCA method but a simple imputation method based on singular value decomposition.
+       See https://bioconductor.org/packages/release/bioc/html/pcaMethods.html for more details.
+
+        Args:
+            dataset (Dataset): Dataset to impute.
+            molecule (str): Molecule type to impute (e.g. protein, peptide etc.).
+            column (str): Name of the value column to impute.
+            method (Literal['svdPca', 'ppca', 'bpca', 'svdImpute'], optional): Imputation method to use. Defaults to "bpca".
+            n_pcs (Optional[int], optional): Number of principal components to use. If not given set to number_samples-1. Defaults to None.
+            result_column (Optional[str], optional): If given, name of the value column to store the imputed values in. Defaults to None.
+            molecules_as_variables (bool, optional): Whether to transpose the input matrix before imputation (treating molecules instead of samples as variables for the PCA). Defaults to False.
+            only_transform_missing (bool, optional): Whether to only predict missing values. Otherwise all values are replaced with their PCA reconstruction. Defaults to True.
+
+        Returns:
+            pd.Series: The imputed values.
+    """
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     if n_pcs is None:
         n_pcs = mat.shape[1] - 1
@@ -78,6 +94,22 @@ def impute_local_least_squares(
     maxSteps = 100,
     result_column: Optional[str] = None,
 ):
+    """Apply local least squares imputation as implemented by the pcaMethods R package.
+       See https://rdrr.io/bioc/pcaMethods/man/llsImpute.html for more details.
+
+        Args:
+            dataset (Dataset): Dataset to impute.
+            molecule (str): Molecule type to impute (e.g. protein, peptide etc.).
+            column (str): Name of the value column to impute.
+            k (int, optional): Number of neighbors to use for imputation. Defaults to 10.
+            correlation (Literal['pearson', 'kendall', 'spearman'], optional): Correlation measure to use for neighbor search. Defaults to "pearson".
+            all_variables (bool, optional): Whether to use all variables for imputation or only the k nearest neighbors. Defaults to True.
+            maxSteps ([type], optional): Maximum number of iterations. Defaults to 100.
+            result_column (Optional[str], optional): If given, name of the value column to store the imputed values in. Defaults to None.
+            
+        Returns:
+            pd.Series: The imputed values.
+    """
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     input = mat.to_numpy().T
     with (robjects.default_converter + numpy2ri.converter).context():

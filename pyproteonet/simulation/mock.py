@@ -5,7 +5,7 @@ import scipy
 
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
-from ..aggregation.flyability import estimate_flyability_upper_bound
+from .flyability import estimate_flyability_upper_bound
 from .protein_peptide import simulate_protein_peptide_dataset
 from .missing_values import simulate_mcars, simulate_mnars_thresholding
 from .utils import get_numpy_random_generator
