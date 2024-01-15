@@ -31,6 +31,7 @@ def impute_molecule(
             "iterative",
             "dae",
             "vae",
+            "collaborative_filtering"
         ]
     if isinstance(result_columns, str):
         result_columns = [result_columns]
@@ -80,6 +81,9 @@ def impute_molecule(
     if 'vae' in methods_set:
         from pyproteonet.imputation.dnn.autoencoder import auto_encoder_impute
         method_fns['vae'] = partial(auto_encoder_impute, validation_fraction=0.1, model_type='VAE')
+    if 'collaborative_filtering' in methods_set:
+        from pyproteonet.imputation.dnn.collaborative_filtering import collaborative_filtering_impute
+        method_fns['collaborative_filtering'] = collaborative_filtering_impute
     for m, rc in tqdm(zip(methods, result_columns), total=len(methods)):
         print(m, rc)
         dataset.values[molecule][rc] = method_fns[m](

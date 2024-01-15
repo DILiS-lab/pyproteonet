@@ -13,9 +13,9 @@ from ..data.dataset import Dataset
 def plot_ratio_scatter(
     dataset: Dataset,
     molecule: str,
-    columns: List[str],
-    high_samples: List[str],
-    low_samples: List[str],
+    columns: Union[str, List[str]],
+    numerator_samples: List[str],
+    denominator_samples: List[str],
     categories: Optional[pd.Series] = None,
     axs_columns: int = 4,
     axs: Optional[List[plt.Axes]] = None,
@@ -27,6 +27,8 @@ def plot_ratio_scatter(
     alpha: Optional[float] = None,
 ):
     markers = ["o", "x", "D", "^", "v"]
+    if isinstance(columns, str):
+        columns = [columns]
     if categories is None:
         unique_categories = [0]
     else:
@@ -35,7 +37,7 @@ def plot_ratio_scatter(
         raise AttributeError("Plotting density is not supported with more than {len(markers)} categories yet")
     fig_rows = math.ceil(len(columns) / axs_columns)
     if axs is None:
-        fig, axs = plt.subplots(fig_rows, axs_columns, figsize=(13, 10))
+        fig, axs = plt.subplots(fig_rows, axs_columns, figsize=(axs_columns * 5, fig_rows * 5))
         axs = axs.flatten()
     for i, (col, ax) in enumerate(zip(columns, axs)):
         vals = dataset.values[molecule][col].unstack(level="sample")
@@ -43,8 +45,8 @@ def plot_ratio_scatter(
             vals = vals.loc[ids]
         if is_log:
             vals = math.e**vals
-        vals_high = vals[high_samples]
-        vals_low = vals[low_samples]
+        vals_high = vals[numerator_samples]
+        vals_low = vals[denominator_samples]
         vals_high = vals_high.median(axis=1)
         vals_low = vals_low.median(axis=1)
         ratio = np.log2(vals_high / vals_low)
@@ -53,7 +55,7 @@ def plot_ratio_scatter(
         if uncertainty_columns is not None:
             uncertainty_column = uncertainty_columns[i]
             uncertainty = dataset.values[molecule][uncertainty_column].unstack(level="sample")
-            uncertainty = uncertainty[high_samples + low_samples].abs().mean(axis=1)
+            uncertainty = uncertainty[numerator_samples + denominator_samples].abs().mean(axis=1)
         non_na_mask = ~ratio.isna()
         for i, category in enumerate(unique_categories):
             if categories is not None:

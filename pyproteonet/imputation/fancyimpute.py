@@ -38,7 +38,7 @@ def generic_fancy_impute(
     matrix_imputed = pd.DataFrame(matrix_imputed, columns=matrix.columns, index=matrix.index)
     vals = matrix_imputed.stack().swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)
-    if result_column is None:
+    if result_column is not None:
         dataset.values[molecule][result_column] = vals
     return vals
 

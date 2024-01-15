@@ -97,6 +97,10 @@ def introduce_random_condition(
             samples = int(len(condition_samples) * samples)
         condition_samples = rng.choice(condition_samples, size=int(samples))
     condition_samples = set(condition_samples)
+    ds_sample_names = set(dataset.sample_names)
+    for sample_name in condition_samples:
+        if sample_name not in ds_sample_names:
+            raise ValueError(f"Condition sample not found! The sample  '{sample_name}' is not in the dataset.")
     if isinstance(affected, collections.abc.Iterable):
         condition_affected_mols = affected
     else:

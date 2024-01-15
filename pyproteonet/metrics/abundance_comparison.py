@@ -101,7 +101,6 @@ def _compare_columns_single_dataset(
         return res
 
 
-#TODO: write docstring
 def compare_columns(
     dataset: Union[Dataset, List[Dataset]],
     molecule: str,
@@ -114,6 +113,25 @@ def compare_columns(
     per_sample: bool = False,
     replace_nan_metric_with: Optional[float] = None
 ) -> pd.DataFrame:
+    """Compare a set of value columns to a reference column according to a set of metrics.
+      This can be used to compare imputation methods by evaluating imputation results against some form of ground truth.
+      Evaluation can be done on a per-sample basis, i.e. the metric is computed for each sample separately and the results are returned as a dataframe with one row per sample.
+
+    Args:
+        dataset (Union[Dataset, List[Dataset]]): Either a single dataset or a list of datasets to evaluate. If multiple datasets are given they should alll share the same molecule and the results are concatenated.
+        molecule (str): The molecule type to evaluate (e.g. 'protein', 'peptide', ...).
+        columns (List[str]): The columns to compare against the reference column.
+        comparison_column (str): The reference column to compare against.
+        ids (Optional[pd.Index], optional): If given, only compare values for molecules with those ids. Defaults to None.
+        metric (Literal[&#39;PearsonR&#39;, &#39;SpearmanR&#39;, &#39;MSE&#39;, &#39;MAE&#39;, &#39;RMSE&#39;, &#39;AE&#39;], optional): The evaluation metric. Defaults to 'PearsonR'.
+        ignore_missing (bool, optional): Whether to ignore missing values or raise an error. Defaults to True.
+        logarithmize (bool, optional): Whether to logarithmize values before comparison. Defaults to True.
+        per_sample (bool, optional): Whether to compute one metric per dataset sample. Defaults to False.
+        replace_nan_metric_with (Optional[float], optional): Use a constant value in case no metric can be calculated (e.g. for PearsonR if all values are constant). Defaults to None.
+
+    Returns:
+        pd.DataFrame: A dataframe with one row per sample if per_sample is True, otherwise one row per value column containing the evaluation results.
+    """
     if isinstance(dataset, Dataset):
         dataset = [dataset]
     res_dfs = []
@@ -140,18 +158,29 @@ def compare_columns(
             res_dfs.append(col_df)
     return pd.concat(res_dfs, ignore_index=True)
 
-#TODO: write docstring
+
 def compare_columns_molecule_groups(
     dataset: Dataset,
     molecule: str,
     columns: List[str],
     comparison_column: str,
     id_groups: Optional[Dict[str, pd.Index]] = None,
-    per_sample: bool = False,
-    return_counts: bool = False,
     *args,
     **kwargs,
 ) -> pd.DataFrame:
+    """Similar to compare_columns() but comparison is done in individual groups of molecule specified by their ids.
+
+    Args:
+        dataset (Union[Dataset, List[Dataset]]): Either a single dataset or a list of datasets to evaluate. If multiple datasets are given they should alll share the same molecule and the results are concatenated.
+        molecule (str): The molecule type to evaluate (e.g. 'protein', 'peptide', ...).
+        columns (List[str]): The columns to compare against the reference column.
+        comparison_column (str): The reference column to compare against.
+        id_groups (Optional[Dict[str, pd.Index]], optional): Dictionary of group names and the corresponding molecule ids for each groups. Defaults to None.
+        **kwargs: Additional arguments passed to compare_columns().
+
+    Returns:
+        pd.DataFrame: A dataframe with the evaluation results.
+    """
     metrics_df = []
     counts_df = []
     if 'group' in columns:
@@ -163,7 +192,6 @@ def compare_columns_molecule_groups(
             columns=columns,
             comparison_column=comparison_column,
             ids=group_ids,
-            per_sample=per_sample,
             *args,
             **kwargs,
         )

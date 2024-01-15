@@ -88,40 +88,7 @@ def solve_profile(X, ratios, sample_combinations):
 
 
 @njit(nogil=True)
-def build_connection_graph(grouping):
-    connected_sample_groups = numba.typed.List()
-
-    connected_indices = numba.typed.List()
-
-    sample_group_id = 0
-
-    for sample_idx in range(grouping.shape[1]):
-        if sample_idx not in connected_indices:
-            sample_group = []
-
-            for compared_sample_idx in range(grouping.shape[1]):
-                comparison = grouping[:, sample_idx] - grouping[:, compared_sample_idx]
-
-                if not np.isnan(comparison).all():
-                    sample_group.append(compared_sample_idx)
-
-                    connected_indices.append(compared_sample_idx)
-
-            if len(sample_group) > 0:
-                connected_sample_groups.append(np.array(sample_group))
-
-                sample_group_id += 1
-
-            else:
-                connected_sample_groups.append(np.array([sample_idx]))
-
-                sample_group_id += 1
-
-    return connected_sample_groups
-
-
-@njit(nogil=True)
-def build_connection_graph_new(grouping, min_ratios: int):
+def build_connection_graph(grouping, min_ratios: int):
     connected_sample_groups = numba.typed.List()
     num_samples = grouping.shape[1]
 
@@ -175,7 +142,7 @@ def mask_group(grouping):
         if not np.isnan(grouping[subgroup_idx, :]).all():
             nan_groups.append(subgroup_idx)
 
-    grouping = grouping[np.array(nan_groups), :]
+    grouping = grouping[np.array(nan_groups, dtype=np.uint64), :]
 
     return grouping
 
@@ -219,8 +186,7 @@ def quantify_groups(groupings, minimum_subgroups, min_ratios: int, median_fallba
         grouping = mask_group(groupings[group_idx])
 
         if grouping.shape[0] >= minimum_subgroups:
-            connected_graph = build_connection_graph_new(grouping=grouping, min_ratios=min_ratios)
-            #connected_graph = build_connection_graph(grouping)
+            connected_graph = build_connection_graph(grouping=grouping, min_ratios=min_ratios)
 
             profile = quantify_group(grouping, connected_graph, min_ratios=min_ratios, median_fallback=median_fallback)
 
@@ -266,7 +232,7 @@ def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, m
     mat = dataset.get_samples_value_matrix(molecule=partner, column=partner_column)
     if not is_log:
         mat = np.log(mat)
-    groupings_dict = {mol:np.ascontiguousarray(mat.loc[partner_ids.index.get_level_values(partner),:].to_numpy().astype(float))
+    groupings_dict = {mol:np.ascontiguousarray(mat.loc[partner_ids.index.get_level_values(partner),:].to_numpy().astype(np.float64))
                       for mol,partner_ids in mapped.groupby(molecule)}
     groupings = numba.typed.List()
     group_ids = []

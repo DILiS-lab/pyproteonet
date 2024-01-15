@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Tuple
 import math
 
 import numpy as np
@@ -8,10 +8,24 @@ from statsmodels.stats.multitest import multipletests
 
 from ..data.dataset import Dataset
 
-#TODO: add docstrings
 def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]],
              nominator_samples: List[str], denominator_samples: List[str],
-             max_pvalue=0.05, min_fc=2, is_log: bool = False):
+             max_pvalue=0.05, min_fc=2, is_log: bool = False)->Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Find differentially expressed molecules usign a t-test and multitest correction (benjamin hochberg).
+
+    Args:
+        dataset (Dataset): The dataset to find differentially expressed molecules in.
+        molecule (str): The molecule type to find differentially expressed molecules for.
+        columns (Union[str, List[str]]): The value column(s) containing the abundance values of potentially differentially expressed molecules.
+        nominator_samples (List[str]): List of samples names to use as nominator when computing fold change.
+        denominator_samples (List[str]): List of samples names to use as denominator when computing fold change.
+        max_pvalue (float, optional): P value to as significance threshold . Defaults to 0.05.
+        min_fc (int, optional): Minimum fold change required to be considered as differentially expressed. Works for both increase and decrease in abundance (e.g. a min. fold change of 2 results in both a fold change of 2 and 0.5 being considered as potentially differentially expressed.). Defaults to 2.
+        is_log (bool, optional): Whether the column values are logarithmized. Defaults to False.
+
+    Returns:
+        Tuple(pd.DataFrame, pd.DataFrame, pd.DataFrame): Tuple of three dataframes representing differential expressions, p-values and fold changes.
+    """
     if isinstance(columns, str):
         columns = [columns]
     des = pd.DataFrame(index=dataset.molecules[molecule].index)
@@ -37,10 +51,27 @@ def find_des(dataset: Dataset, molecule:str, columns: Union[str, List[str]],
     return des, pvalues_mat, fcs
 
 
-#TODO: add docstrings
 def evaluate_des(dataset: Dataset, molecule: str, columns: Union[str, List[str]], numerator_samples: List[str], 
                  denominator_samples: List[str], gt_fc: pd.Series, min_fc: float = 1.5, max_pvalue: float = 0.05,
                  is_log: bool = False, absolute_metrics: bool = False)->pd.DataFrame:
+    """Compares the results of finding differentially expressed molecule to known ground troth differential expressiosn according to a ground truth fold change.
+       Evaluation is done with respect to Precision, Recall, Specificity, Accuracy, FP Rate and F1 Score (or corresponding absolute metrics if absolute_metrics is True).
+
+    Args:
+        dataset (Dataset): The dataset to find differentially expressed molecules in.
+        molecule (str): The molecule type to find differentially expressed molecules for.
+        columns (Union[str, List[str]]): The value column(s) containing the abundance values of potentially differentially expressed molecules.
+        nominator_samples (List[str]): List of samples names to use as nominator when computing fold change.
+        denominator_samples (List[str]): List of samples names to use as denominator when computing fold change.
+        gt_fc (pd.Series): Ground truth fold change for each molecule.
+        min_fc (int, optional): Minimum fold change required to be considered as differentially expressed. Works for both increase and decrease in abundance (e.g. a min. fold change of 2 results in both a fold change of 2 and 0.5 being considered as potentially differentially expressed.). Defaults to 2.
+        max_pvalue (float, optional): P value to as significance threshold . Defaults to 0.05.
+        is_log (bool, optional): Whether the column values are logarithmized. Defaults to False.
+        absolute_metrics (bool, optional): Whether to return absolute numbers of correctly/incorrectly found DEs or whether to use relative metrics (Precision, Recall ...). Defaults to False.
+
+    Returns:
+        pd.DataFrame: The evaluation results according to the calculated metrics.
+    """
     des, pvalues, fc = find_des(dataset=dataset, molecule=molecule, columns=columns,
                                 nominator_samples=numerator_samples, denominator_samples=denominator_samples,
                                 min_fc=min_fc, max_pvalue=max_pvalue, is_log=is_log)

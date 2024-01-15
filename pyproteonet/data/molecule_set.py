@@ -347,6 +347,22 @@ class MoleculeSet:
         partner_molecule: str = None,
         only_unique: bool = False,
     )->pd.Series:
+        """Returns the node degrees for the given molecule type according to the given mapping.
+           E.g. can be used to get the number of peptides per protein.
+
+        Args:
+            molecule (str): The molecule type to get the degrees for. 
+            mapping (str): The mapping to use to generate the graph for the degree calculation.
+            result_column (Optional[str], optional): If given stores the results as a molecule column in the molecule set. Defaults to None.
+            partner_molecule (str, optional): _description_. Defaults to None.
+            only_unique (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            AttributeError: _description_
+
+        Returns:
+            pd.Series: _description_
+        """
         molecule, mapping, partner = self.infer_mapping(
             molecule=molecule, mapping=mapping
         )

@@ -13,7 +13,7 @@ from pyproteonet.aggregation.partner_summarization import partner_aggregation
 
 def simulate_protein_peptide_dataset(
     molecule_set: MoleculeSet,
-    mapping: str = 'peptide-protein',
+    mapping: str,
     samples: Union[int, List[str]] = 10,
     log_abundance_mu: float = 10,
     log_abundance_sigma: float = 2,

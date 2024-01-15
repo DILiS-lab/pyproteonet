@@ -49,7 +49,25 @@ def simulate_mnars_thresholding(
     in_log_space: bool = False,
     rng: Optional[Generator] = None,
     inplace: bool = False,
-):
+)->Dataset:
+    """Simulates (missing not at random) MNAR missing values.
+      For each value a threshold is drawn from a normal distribution. Values below the threshold are masked.
+
+    Args:
+        dataset (Dataset): Dataset to simulate missing values for.
+        thresh_mu (float): The mean of the normal distribution to draw the thresholds from.
+        thresh_sigma (float): The standard deviation of the normal distribution to draw the thresholds from.
+        molecule (str, optional): The molecule to apply missing values to. Defaults to "peptide".
+        column (str, optional): The value column to apply missing values to. Defaults to "abundance".
+        result_column (Optional[str], optional): Value column to write the results to, if not given same as column . Defaults to None.
+        mask_column (Optional[str], optional): If given, the name of the value column to store in whether a value got masked or not. Defaults to None.
+        in_log_space (bool, optional): Whether to loagrithmize abundance values before doing the thresholding. Defaults to False.
+        rng (Optional[Generator], optional): The random generator to use to draw missing values. Defaults to None.
+        inplace (bool, optional): If false the dataset will be copied before simulating missing values. Defaults to False.
+
+    Returns:
+        Dataset: The dataset with simulated missing values.
+    """
     if rng is None:
         rng = np.random.default_rng()
     if not inplace:
@@ -116,6 +134,22 @@ def simulate_mcars(
     mask_only_non_missing: bool = True, 
     inplace: bool = False,
 ):
+    
+    """Simulates (missing at random) MCAR missing values, by masking a given amount of values at random.
+    Args:
+        dataset (Dataset): Dataset to simulate missing values for.
+        amount (Union[int, float]): The amount of values to mask. If float between 0 and 1, the amount is interpreted as a fraction of the total number of values.
+        molecule (str, optional): The molecule to apply missing values to. Defaults to "peptide".
+        column (str, optional): The value column to apply missing values to. Defaults to "abundance".
+        result_column (Optional[str], optional): Value column to write the results to, if not given same as column . Defaults to None.
+        mask_column (Optional[str], optional): If given, the name of the value column to store in whether a value got masked or not. Defaults to None.
+        rng (Optional[Generator], optional): The random generator to use to draw missing values. Defaults to None.
+        mask_only_non_missing (bool, optional): Whether to only mask non missing values. Defaults to True.
+        inplace (bool, optional): If false the dataset will be copied before simulating missing values. Defaults to False.
+
+    Returns:
+        Dataset: The dataset with simulated missing values.
+    """
     if rng is None:
         rng = np.random.default_rng()
     if not inplace:
