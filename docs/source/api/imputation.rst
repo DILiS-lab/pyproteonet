@@ -18,5 +18,5 @@ pyproteonet.imputation
    pyproteonet.imputation.r.pca_methods
    pyproteonet.imputation.dnn.autoencoder
    pyproteonet.imputation.dnn.collaborative_filtering
-   pyproteonet.imputatoin.dnn.gnn.heterogeneous
-   pyproteonet.imputation.dnn.gnn.homogeneneous
+   pyproteonet.imputation.dnn.gnn.heterogeneous
+   pyproteonet.imputation.dnn.gnn.homogeneous
