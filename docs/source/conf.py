@@ -26,6 +26,7 @@ autosummary_generate = True  # Turn on sphinx.ext.autosummary
 templates_path = ['_templates']
 exclude_patterns = []
 
+nb_execution_mode = "off" # Do not execute notebooks in CI and use the cached output instead to build the docs faster
 
 
 # -- Options for HTML output -------------------------------------------------

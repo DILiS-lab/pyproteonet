@@ -29,6 +29,8 @@ for protein quantification and imputation.
 
    notebooks/getting_started
    notebooks/simulation
+   notebooks/evaluate_imputation_abundance
+   notebooks/evaluate_imputation_fold_change
 
 .. toctree:: 
    :caption: Python API
