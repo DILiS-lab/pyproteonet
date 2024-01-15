@@ -1,4 +1,4 @@
-﻿pyproteonet.aggregation.ibaq.iBAQ
+pyproteonet.aggregation.ibaq.iBAQ
 =================================
 
 .. currentmodule:: pyproteonet.aggregation.ibaq

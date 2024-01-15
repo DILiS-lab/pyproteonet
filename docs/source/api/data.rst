@@ -1,5 +1,5 @@
 pyproteonet.data
-======================
+================
 
 .. autosummary::
    :toctree: _autosummary_data

@@ -1,5 +1,5 @@
 pyproteonet.metrics
-======================
+===================
 
 .. autosummary::
    :toctree: _autosummary_metrics
@@ -9,3 +9,4 @@ pyproteonet.metrics
    pyproteonet.metrics.abundance_comparison
    pyproteonet.metrics.differential_expression
    pyproteonet.metrics.ratios
+   

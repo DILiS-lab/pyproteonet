@@ -1,5 +1,4 @@
-"""
-Imputation methods for missing values in proteomics data. Next to several imputation methods implemented by different Python packages
+"""Imputation methods for missing values in proteomics data. Next to several imputation methods implemented by different Python packages
 and newly proposed graph neural network imputation methods this package also wraps imputation methods from popular R packages.
 """
 

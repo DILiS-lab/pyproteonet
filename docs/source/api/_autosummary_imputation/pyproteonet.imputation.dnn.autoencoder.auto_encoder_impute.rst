@@ -1,4 +1,4 @@
-﻿pyproteonet.imputation.dnn.autoencoder.auto\_encoder\_impute
+pyproteonet.imputation.dnn.autoencoder.auto\_encoder\_impute
 ============================================================
 
 .. currentmodule:: pyproteonet.imputation.dnn.autoencoder

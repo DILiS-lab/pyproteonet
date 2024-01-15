@@ -1,31 +1,34 @@
 from typing import Optional, Literal
+from functools import lru_cache
 
 import numpy as np
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
 from rpy2.robjects import numpy2ri
 
 import pandas as pd
 from ...data.dataset import Dataset
 
-if not robjects.r('"BiocManager" %in% rownames(installed.packages())')[0]:
-    robjects.r('install.packages("BiocManager", repos = "https://cloud.r-project.org")')
-bioc_manager = importr("BiocManager")
-if not robjects.r('"MsCoreUtils" %in% rownames(installed.packages())')[0]:
-    bioc_manager.install("MsCoreUtils", ask=False)
-if not robjects.r('"pcaMethods" %in% rownames(installed.packages())')[0]:
-    bioc_manager.install("pcaMethods", ask=False)
-pca_methods = importr("pcaMethods")
-ms_core_utils = importr("MsCoreUtils")
-base = importr("base")
-r_mat_mul = robjects.r['%*%']
+@lru_cache(maxsize=1)
+def _init():
+    if not robjects.r('"BiocManager" %in% rownames(installed.packages())')[0]:
+        robjects.r('install.packages("BiocManager", repos = "https://cloud.r-project.org")')
+    bioc_manager = importr("BiocManager")
+    if not robjects.r('"MsCoreUtils" %in% rownames(installed.packages())')[0]:
+        bioc_manager.install("MsCoreUtils", ask=False)
+    if not robjects.r('"pcaMethods" %in% rownames(installed.packages())')[0]:
+        bioc_manager.install("pcaMethods", ask=False)
+    pca_methods = importr("pcaMethods")
+    ms_core_utils = importr("MsCoreUtils")
+    base = importr("base")
+    r_mat_mul = robjects.r['%*%']
 
-nan_to_na = robjects.r(
-"""function(mat){
-    replace(mat, is.na(mat), NA)
-}"""
-)
+    nan_to_na = robjects.r(
+    """function(mat){
+        replace(mat, is.na(mat), NA)
+    }"""
+    )
+    return pca_methods, base, r_mat_mul, nan_to_na
 
 
 def impute_pca_method(
@@ -55,6 +58,7 @@ def impute_pca_method(
         Returns:
             pd.Series: The imputed values.
     """
+    pca_methods, base, r_mat_mul, nan_to_na = _init()
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     if n_pcs is None:
         n_pcs = mat.shape[1] - 1
@@ -110,6 +114,7 @@ def impute_local_least_squares(
         Returns:
             pd.Series: The imputed values.
     """
+    pca_methods, base, r_mat_mul, nan_to_na = _init()
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     input = mat.to_numpy().T
     with (robjects.default_converter + numpy2ri.converter).context():

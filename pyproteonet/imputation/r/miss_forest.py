@@ -1,5 +1,5 @@
-from typing import Optional, Literal
-import multiprocessing
+from typing import Optional
+from functools import lru_cache
 
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
@@ -10,15 +10,18 @@ import numpy as np
 import pandas as pd
 from ...data.dataset import Dataset
 
-if not robjects.r('"missForest" %in% rownames(installed.packages())')[0]:
-    robjects.r('install.packages("missForest", repos = "https://cloud.r-project.org")')
-miss_forest = importr("missForest")
-if not robjects.r('"doParallel" %in% rownames(installed.packages())')[0]:
-    robjects.r('install.packages("doParallel", repos = "https://cloud.r-project.org")')
-do_parallel = importr("doParallel")
-if not robjects.r('"doRNG" %in% rownames(installed.packages())')[0]:
-    robjects.r('install.packages("doRNG", repos = "https://cloud.r-project.org")')
-do_rng = importr("doRNG")
+@lru_cache(maxsize=1)
+def _init():
+    if not robjects.r('"missForest" %in% rownames(installed.packages())')[0]:
+        robjects.r('install.packages("missForest", repos = "https://cloud.r-project.org")')
+    miss_forest = importr("missForest")
+    if not robjects.r('"doParallel" %in% rownames(installed.packages())')[0]:
+        robjects.r('install.packages("doParallel", repos = "https://cloud.r-project.org")')
+    do_parallel = importr("doParallel")
+    if not robjects.r('"doRNG" %in% rownames(installed.packages())')[0]:
+        robjects.r('install.packages("doRNG", repos = "https://cloud.r-project.org")')
+    do_rng = importr("doRNG")
+    return miss_forest
 
 
 def miss_forest_impute(
@@ -43,6 +46,7 @@ def miss_forest_impute(
     Returns:
         pd.Series: The imputed values.
     """
+    miss_forest = _init()
     matrix = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     mat = matrix.to_numpy()
     if molecules_as_variables:

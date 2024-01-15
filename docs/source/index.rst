@@ -19,6 +19,21 @@ by taking peptide-to-protein relations into account. From a technical point of v
 is achived by training a graph neural network (GNN)
 for protein quantification and imputation. 
 
+
+Installation
+============
+
+Installation is best done within a Conda environment (you might also consider Mamba as a drop-in replacement for Conda with higher performance). 
+It is advised to install the following requirements via Conda/Mamba because they are either not available via pip or using the pip version might lead to problems:
+
+* r-base, ``conda install -c conda-forge r-base`` (you need an R installation because several provided imputation methods are wrappers around R packages)
+* Pytorch, ``conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia`` (see the `PyTorch website <https://pytorch.org/get-started/locally/>`_ for instructions for your system and Cuda version) 
+* DGL, ``conda install -c dglteam dgl`` (see the `DGL website <https://www.dgl.ai/pages/start.html>`_ for instructions for your system and Cuda version)
+
+Afterward you can clone PyProteoNet from github (`https://github.com/Tobias314/pyproteonet <https://github.com/Tobias314/pyproteonet>`_) and install it in the created Conda/Mamba environment via pip by running the following command inside the root of the pyprotonet directory:
+``pip install ./``
+
+
 .. note::
 
    This project is under active development.
@@ -32,14 +47,15 @@ for protein quantification and imputation.
    notebooks/evaluate_imputation_abundance
    notebooks/evaluate_imputation_fold_change
 
-.. toctree:: 
+.. toctree::
+   :maxdepth: 10
    :caption: Python API
 
    api/data
-   api/simulation
    api/aggregation
+   api/simulation
    api/imputation
-   api/normalization
+   api/metrics
 
 
 Indices and tables

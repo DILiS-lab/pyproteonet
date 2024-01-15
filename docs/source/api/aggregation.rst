@@ -1,5 +1,5 @@
 pyproteonet.aggregation
-======================
+=======================
 
 .. autosummary::
    :toctree: _autosummary_aggregation

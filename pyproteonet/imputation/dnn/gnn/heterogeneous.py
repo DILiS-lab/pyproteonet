@@ -217,6 +217,11 @@ class ImputationModule(L.LightningModule):
         )
 
     def configure_optimizers(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
 
