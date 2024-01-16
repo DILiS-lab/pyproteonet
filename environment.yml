@@ -143,6 +143,7 @@ dependencies:
   - scipy=1.9.3=py310hdfbd76f_2
   - sed=4.8=he412f7d_0
   - setuptools=65.5.1=pyhd8ed1ab_0
+  - sphinx
   - sympy=1.11.1=py310hff52083_2
   - sysroot_linux-64=2.12=he073ed8_15
   - tbb=2021.7.0=h924138e_0
