@@ -16,7 +16,7 @@ Results from multiple aggregation and imputation methods can be stored for the s
 Next to established imputation methods PyProteoNet also implements our newly proposed Graph Neural Network imputation
 which operates on the protein-peptide graph and, therefore, jointly takes proteins and peptides into account.
 
-Read the documentation for more details: `https://pyproteonet.readthedocs.io/en/latest <https://pyproteonet.readthedocs.io/en/latest>`_.
+Read the documentation for more details: `https://pyproteonet.readthedocs.io <https://pyproteonet.readthedocs.io>`_.
 
 Installation
 ============
