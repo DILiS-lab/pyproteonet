@@ -118,7 +118,7 @@ class MaskedDataset():
         mat_df = mat_df.loc[mol_ids]
         if only_set_masked:
             mask = self.masks[molecule].loc[mol_ids, samples].values
-            mat_df.values[mask] = matrix[mask]
+            mat_df.mask(mask, matrix, inplace=True)
         else:
             mat_df.values[:, :] = matrix
         self.dataset.set_samples_value_matrix(
@@ -140,6 +140,7 @@ class MaskedDataset():
         self,
         feature_columns: Dict[str, Union[str, List[str]]],
         mappings: Union[str, List[str]],
+        molecule_columns: Dict[str, Union[str, List[str]]] = {},
         mapping_directions: Dict[str, Tuple[str, str]] = {},
         make_bidirectional: bool = False,
         features_to_float32: bool = True,
@@ -148,6 +149,7 @@ class MaskedDataset():
         g = self.dataset.to_dgl_graph(
             feature_columns=feature_columns,
             mappings=mappings,
+            molecule_columns=molecule_columns,
             mapping_directions=mapping_directions,
             make_bidirectional=make_bidirectional,
             features_to_float32=features_to_float32,

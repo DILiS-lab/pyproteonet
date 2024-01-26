@@ -8,7 +8,8 @@ from matplotlib import pyplot as plt
 from ..data import Dataset
 
 def plot_mapping_degree_distribution(dataset: Dataset, molecule: str, mapping: str,
-                                     cutoff: int = 30, cut_top_k: Optional[int] = None, ax: Optional[plt.Axes] = None):
+                                     cutoff: int = 30, cut_top_k: Optional[int] = None, ax: Optional[plt.Axes] = None,
+                                     overall_percentage_label: bool = True):
     if ax is None:
         fig, ax = plt.subplots(figsize=(14,3))
     degs = dataset.molecule_set.get_mapping_degrees(molecule=molecule, mapping=mapping, only_unique=False)
@@ -16,18 +17,18 @@ def plot_mapping_degree_distribution(dataset: Dataset, molecule: str, mapping: s
     degs_shared = degs - degs_unique
     degs_plot = pd.DataFrame({'All':degs, 'Unique':degs_unique, 'Shared': degs_shared})
     degs_plot = degs_plot.stack()
-    degs_cutoff = degs_plot[degs_plot >= cutoff]
-    degs_plot = degs_plot[degs_plot<cutoff]
-    #degs_cutoff = degs_plot[degs_plot >= cutoff].count()
     degs_plot = degs_plot.groupby([degs_plot, degs_plot.index.get_level_values(-1)]).count()
-    degs_cutoff = degs_cutoff.groupby(degs_cutoff.index.get_level_values(-1)).count()
     degs_plot = degs_plot.reset_index()
     degs_plot = degs_plot.rename(columns={'level_0':'Degree', 'level_1': 'Type', 0:'Count'})
-    degs_cutoff = degs_cutoff.reset_index()
-    degs_cutoff['Degree'] = f'{cutoff}+'
-    degs_cutoff.rename(columns={'index':f'Type', 0:'Count'}, inplace=True)
-    degs_plot = pd.concat([degs_plot, degs_cutoff], ignore_index=True)
     degs_plot['Percentage'] = degs_plot['Count'] / dataset.molecules[molecule].shape[0] * 100
+    degs_cutoff = degs_plot[degs_plot['Degree'] >= cutoff]
+    degs_plot = degs_plot[degs_plot['Degree']<cutoff]
+    #degs_cutoff = degs_plot[degs_plot >= cutoff].count()
+    #degs_cutoff = degs_cutoff.groupby(degs_cutoff.index.get_level_values(-1)).count()
+    #degs_cutoff = degs_cutoff.reset_index()
+    degs_cutoff['Degree'] = f'{cutoff}+'
+    #degs_cutoff.rename(columns={'index':'Type', 0:'Count'}, inplace=True)
+    degs_plot = pd.concat([degs_plot, degs_cutoff], ignore_index=True)
     topk_height = math.inf
     if cut_top_k:
         topk_height = degs_plot.Percentage.nlargest(n=cut_top_k+1).min() + 10

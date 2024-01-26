@@ -11,7 +11,7 @@ def load_maxquant(
     peptides_table: Union[pd.DataFrame, str, Path],
     samples: Optional[List[str]] = None,
     protein_groups_table: Optional[Union[pd.DataFrame, str, Path]] = None,
-    protein_group_value_columns: List[str] = ["Intensity", "iBAQ", "LFQ intensity"],
+    protein_group_value_columns: List[str] = ["Intensity"],
     peptide_value_columns: List[str] = ["Intensity"],
     peptide_columns: List[str] = ["Sequence"],
     protein_group_columns: List[str] = ["Fasta headers"],
@@ -25,7 +25,7 @@ def load_maxquant(
         samples (List[str], optional): List of sample names to load (must be present as columns in peptides.txt and proteinGroups.txt).
         protein_group_value_columns (List[str], optional): Values to load for every protein group and sample. 
             Sample name and value column will be concatenated to a column name which is then looked up n the peptides table.
-            Defaults to ["Intensity", "iBAQ", "LFQ intensity"].
+            Defaults to ["Intensity"].
         peptide_value_columns (List[str], optional): Values to load for every protein group and sample. 
             Sample name and value column will be concatenated to a column name which is then looked up in the protein groups table.
             Defaults to ["Intensity"].

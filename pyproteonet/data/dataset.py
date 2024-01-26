@@ -723,6 +723,7 @@ class Dataset:
         self,
         feature_columns: Dict[str, Union[str, List[str]]],
         mappings: Union[str, List[str]],
+        molecule_columns: Dict[str, Union[str, List[str]]] = {},
         mapping_directions: Dict[str, Tuple[str, str]] = {},
         make_bidirectional: bool = False,
         features_to_float32: bool = True,
@@ -788,6 +789,23 @@ class Dataset:
                     mol_ids, samples
                 ]
                 feat = torch.from_numpy(mat.to_numpy())
+                if features_to_float32:
+                    feat = feat.to(torch.float32)
+                g.nodes[mol].data[feature] = feat
+        for mol, mol_features in molecule_columns.items():
+            if isinstance(mol_features, str):
+                mol_features = [mol_features]
+            mol_ids = self.molecules[mol].index
+            for feature in mol_features:
+                if feature in {"hidden", "mask"}:
+                    raise KeyError(
+                        'Feature names "hidden" and "mask" are reserved names'
+                    )
+                vals = self.molecules[mol][feature]
+                if vals.dtype != object:
+                    feat = torch.from_numpy(vals[:, np.newaxis].to_numpy())
+                else:
+                    feat = torch.from_numpy(np.array(list(vals)))
                 if features_to_float32:
                     feat = feat.to(torch.float32)
                 g.nodes[mol].data[feature] = feat

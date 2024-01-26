@@ -44,7 +44,7 @@ def map_protein_sequence(
             #'from': "ACC",
             #'to': 'ACC',
             "format": "tsv",
-            "query": " OR ".join([f"accession:{id}" for id in uniprot_ids[start : start + request_size]]),
+            "query": " OR ".join([f"accession:{id}" for id in uniprot_ids[start : start + request_size] if ':' not in id and '_' not in id]),
             #'query': " OR ".join(uniprot_ids[start:start+page_size]),
             "fields": "accession,sequence",
             #'size': min(request_size, len(uniprot_ids) - start),
@@ -52,14 +52,22 @@ def map_protein_sequence(
         # data = data.encode('ascii')
         response = requests.get(base_url, params=params)
         df_result = pd.read_csv(StringIO(response.content.decode("utf-8")), sep="\t")
-        df_result.columns = ["entry", "sequence"]
-        results.append(df_result)
+        if len(df_result.columns) == 2:
+            df_result.columns = ["entry", "sequence"]
+            results.append(df_result)
+        else:
+            print('Request failed')
+            print(df_result)
         while "Link" in response.headers:
             link = response.headers["Link"].partition(">")[0][1:]
             response = requests.get(link)
             df_result = pd.read_csv(StringIO(response.content.decode("utf-8")), sep="\t")
-            df_result.columns = ["entry", "sequence"]
-            results.append(df_result)
+            if len(df_result.columns) == 2:
+                df_result.columns = ["entry", "sequence"]
+                results.append(df_result)
+            else:
+                print('Request failed')
+                print(df_result)
     results = pd.concat(results, ignore_index=True)
     #results.set_index("entry", drop=True, inplace=True, verify_integrity=True)
     #assert len(results) == len(uniprot_ids) and uniprot_ids.isin(results.index).all()
