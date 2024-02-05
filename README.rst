@@ -1,11 +1,9 @@
-  ⚠️ **Warning**: This package is still under heavy development!
-
-
 PyProteoNet
 ===========
 
-**PyProteoNet** is a Python package for protein aggregation 
-and imputation, as well as in silico data generation.
+**PyProteoNet** is a Python package for protein quantification 
+and imputation as well as in silico data generation 
+with a focus on evaluating different imputation methods on proteomics data.
 Mass spectrometry experiments are represented by a set of molecules.
 Generally, those molecules are proteins and peptides. 
 However, the underlying data structures allow for the extension to arbitrary molecule types
