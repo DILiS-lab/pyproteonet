@@ -8,7 +8,7 @@ Mass spectrometry experiments are represented by a set of molecules.
 Generally, those molecules are proteins and peptides. 
 However, the underlying data structures allow for the extension to arbitrary molecule types
 like mRNA.
-Given a dataset PyProteoNet provides functions for peptide to protein aggregation as well as a range of common imputation methods.
+Given a dataset, PyProteoNet provides functions for peptide-to-protein aggregation as well as a range of common imputation methods.
 Results from multiple aggregation and imputation methods can be stored for the same dataset facilitating evaluation and comparison of different methods.
 
 Next to established imputation methods PyProteoNet also implements our newly proposed Graph Neural Network imputation
@@ -42,3 +42,8 @@ There is a `Getting Started Notebook <https://github.com/Tobias314/pyproteonet/b
 Documentation
 ============================
 There is a `Read the Docs <https://pyproteonet.readthedocs.io/en/latest>`_ page containing more examples and documentation.
+
+
+References
+==========
+The implementation of autoencoder-based as well as collaborative-filtering-based imputation methods is taken from the `PIMMS project <https://github.com/RasmussenLab/pimms>`_.
