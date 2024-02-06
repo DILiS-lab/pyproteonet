@@ -15,7 +15,9 @@ def load_maxquant(
     peptide_value_columns: List[str] = ["Intensity"],
     peptide_columns: List[str] = ["Sequence"],
     protein_group_columns: List[str] = ["Fasta headers"],
-    missing_value: float = 0
+    missing_value: float = 0,
+    peptide_protein_group_map_column: str = 'Protein group IDs',
+    remove_invalid_mappings: bool = False,
 ) -> Dataset:
     """Loads a dataset given in MaxQuant format (experimental for now). Might not support all datsets.
 
@@ -41,22 +43,24 @@ def load_maxquant(
         peptides_table = pd.read_csv(peptides_table, sep="\t")
     if samples is None:
         samples = []
-        for value_column in ['Intensity']:
+        for value_column in peptide_value_columns:
             value_samples = peptides_table.columns.str.extract(f'{value_column} (.+)')
             samples.append(set(value_samples.loc[~value_samples.loc[:,0].isna(), 0]))
         samples = list(set.intersection(*samples))
         samples.sort()
     if protein_groups_table is None:
-        protein_groups = peptides_table.loc[:, 'Protein group IDs'].astype(str).str.split(';').explode().unique().astype(int)
+        protein_groups = peptides_table.loc[:, peptide_protein_group_map_column].astype(str).str.split(';').explode().unique().astype(int)
         protein_groups = pd.DataFrame(index=pd.Index(protein_groups, name='id')) 
     elif isinstance(protein_groups_table, (str, Path, pd.DataFrame)):
         if isinstance(protein_groups_table, (str, Path)):
             protein_groups_table = pd.read_csv(protein_groups_table, sep="\t")
         protein_groups = protein_groups_table.loc[:, protein_group_columns]
     peptides = peptides_table.loc[:, peptide_columns].copy()
-    map = peptides_table["Protein group IDs"].astype(str).str.split(";").explode().astype(int)
-    map = map.reset_index().rename(columns={"index": "peptide", "Protein group IDs": "protein_group"})
-    #import pdb; pdb.set_trace()
+    map = peptides_table[peptide_protein_group_map_column].astype(str).str.split(";").explode().astype(int)
+    if remove_invalid_mappings:
+        valid_protein_groups = protein_groups.index
+        map = map[map.isin(valid_protein_groups)]
+    map = map.reset_index().rename(columns={"index": "peptide", peptide_protein_group_map_column: "protein_group"})
     map.set_index(['peptide', 'protein_group'], inplace=True, drop=True)
     # mapping_protein_group = {
     #     "protein_group": pd.DataFrame({"id": protein_groups.index, "map_id": protein_groups.index}),

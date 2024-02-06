@@ -25,8 +25,8 @@ class DatasetMoleculeValues:
     def __getitem__(self, key):
         return self.dataset.get_column_flat(molecule=self.molecule, column=key)
 
-    def __setitem__(self, key, values):
-        self.dataset.set_column_flat(molecule=self.molecule, values=values, column=key)
+    def __setitem__(self, key: str, values: Union[pd.Series, int, float, pd.DataFrame]):
+        self.dataset.set_column_lf(molecule=self.molecule, values=values, column=key)
 
     @property
     def df(self):
@@ -91,6 +91,44 @@ class Dataset:
                     values[molecule.strip("/")] = store[molecule]
             ds.create_sample(name=sample_path.stem, values=values)
         return ds
+    
+    @classmethod
+    def from_pandas(
+        cls,
+        dfs: Dict[str, Dict[str, pd.DataFrame]],
+        mappings: Dict[str, pd.DataFrame]
+    ) -> "Dataset":
+        """Transforming a pandas dataframe into a dataset. Useful for loading tabular peptide abundance data with a mapping column mapping peptides to proteins.
+
+        Args:
+            dfs (Dict[str, Dict[str, pd.DataFrame]]): Two level dictionary molecule type name, value name, and nxs pandas dataframes where n is the number of molecules and s the number of samples.   
+            mappings (Dict[str, pd.DataFrame]): A dictionary of mapping name and pandas dataframe with multilevel index describing the molecule mapping.
+
+        Returns:
+            Dataset: the created dataset.
+        """
+        molecules = {}
+        for molecule, values in dfs.items():
+            indices = [df.index for df in values.values()]
+            mol_index = indices[0]
+            for i in indices[1:]:
+                mol_index = mol_index.intersection(i)
+            molecules[molecule] = mol_index
+        for map_df in mappings.values():
+            if map_df.index.nlevels != 2:
+                raise ValueError("Mappings need to have a two level index.")
+            for i in range(2):
+                if map_df.index.names[i] not in molecules:
+                    molecules[map_df.index.names[i]] = map_df.index.get_level_values(i).unique()
+                else:
+                    molecules[map_df.index.names[i]] = molecules[map_df.index.names[i]].intersection(map_df.index.get_level_values(i))
+        ms = MoleculeSet(molecules={k:pd.DataFrame(index=v) for k,v in molecules.items()}, mappings=mappings)
+        dataset = Dataset(molecule_set=ms)
+        for molecule, values in dfs.items():
+            for name, df in values.items():
+                dataset.set_wf(matrix=df, molecule=molecule, column=name, create_samples_if_not_exists=True)
+        return dataset
+
 
     @classmethod
     def from_mapped_dataframe(
@@ -329,17 +367,17 @@ class Dataset:
         """
         return self.copy(molecule_ids={molecule: ids}, copy_molecule_set=True)
 
-    def lf(
+    def get_lf(
         self,
         molecule: str,
-        columns: Optional[List[str]] = None,
+        columns: Optional[Union[str, List[str]]] = None,
         molecule_columns: List[str] = [],
     ):
         """Returns a dataframe in long format with multindex (sample id, molecule id) representing the value columns for the specified molecule type.
 
         Args:
             molecule (str): The molecule type (e.g. protein, peptide ...)
-            columns (Optional[List[str]], optional): The value columns to include in the result, default to all vall columns. Defaults to None.
+            columns (Optional[Union[str, List[str]], optional): The value columns to include in the result, default to all vall columns. Defaults to None.
             molecule_columns (List[str], optional): Any molecule columns from the MoleculeSet to include in the resulting dataframe. Defaults to [].
 
         Returns:
@@ -349,7 +387,7 @@ class Dataset:
             molecule=molecule, columns=columns, molecule_columns=molecule_columns
         )
 
-    def wf(self, molecule: str, column: str)->pd.DataFrame:
+    def get_wf(self, molecule: str, column: str)->pd.DataFrame:
         """Returns a dataframe in wide format (molecule ids as index, sample names as columns) representing the values of the specified value column for the specified molecule type.
 
         Args:
@@ -364,20 +402,22 @@ class Dataset:
     def get_values_flat(
         self,
         molecule: str,
-        columns: Optional[List[str]] = None,
+        columns: Optional[Union[str, List[str]]] = None,
         molecule_columns: List[str] = [],
     )->pd.DataFrame:
         """Returns a dataframe in long format with multindex (sample id, molecule id) representing the value columns for the specified molecule type.
 
         Args:
             molecule (str): The molecule type (e.g. protein, peptide ...)
-            columns (Optional[List[str]], optional): The value columns to include in the result, default to all vall columns. Defaults to None.
+            columns (Optional[Union[str, List[str]]], optional): The value columns to include in the result, default to all vall columns. Defaults to None.
             molecule_columns (List[str], optional): Any molecule columns from the MoleculeSet to include in the resulting dataframe. Defaults to [].
 
         Returns:
             pd.DataFrame: the resulting dataframe
         """
         sample_names, df = [], []
+        if isinstance(columns, str):
+            columns = [columns]
         for name, sample in self.samples_dict.items():
             if columns is None:
                 values = sample.values[molecule].copy()
@@ -549,8 +589,24 @@ class Dataset:
             return vals, eq_nan(vals, self.missing_value)
         else:
             return vals
-
-    def set_column_flat(
+        
+    def set_lf(
+        self,
+        molecule: str,
+        values: pd.DataFrame,
+        skip_foreign_ids: bool = False,
+        fill_missing: bool = False
+        ):
+        for c in values.columns:
+            self.set_column_lf(
+                molecule=molecule,
+                values=values[c],
+                column=c,
+                skip_foreign_ids=skip_foreign_ids,
+                fill_missing=fill_missing,
+            )       
+    
+    def set_column_lf(
         self,
         molecule: str,
         values: Union[pd.Series, int, float],
@@ -628,21 +684,27 @@ class Dataset:
             ]
         return res
 
-    def set_samples_value_matrix(
-        self, matrix: pd.DataFrame, molecule: str, column: str = "abundance"
+    def set_wf(
+        self, matrix: pd.DataFrame, molecule: str, column: str = "abundance", create_samples_if_not_exists: bool = False
     ):
         """Sets a dataframe in wide format (molecule ids as index, sample names as columns) for the values of the given value column for the given molecule type.
 
         Args:
             molecule (str): The molecule type (e.g. protein, peptide ...)
             column (Optional[List[str]], optional): The name of the value column to store the result in.
+            create_samples_if_not_exists (bool, optional): Whether to create new samples if they do not exist. Defaults to False.
             
         Returns:
             pd.DataFrame: the resulting dataframe
         """
-        for sample_name, sample in self.samples_dict.items():
-            if sample_name in matrix.keys():
-                sample.values[molecule][column] = matrix[sample_name]
+        for c in matrix.columns:
+            if c not in self.samples_dict:
+                if create_samples_if_not_exists:
+                    self.create_sample(name=c, values={molecule: pd.DataFrame({column: matrix[c]})})
+                else:
+                    raise KeyError(f"Sample {c} does not exist.")
+            else:
+                self.samples_dict[c].values[molecule][column] = matrix[c]
 
     def rename_molecule(self, molecule: str, new_name: str):
         """Rename a molecule type.

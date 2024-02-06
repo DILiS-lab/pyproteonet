@@ -20,7 +20,7 @@ protein_sequences = {
 
 
 def load_maxlfq_benchmark(path: Path = TESTDATA_DIR / 'maxlfq_benchmark')->Dataset:
-    return datasets.load_maxlfq_benchmark(path=path)
+    return datasets.load_maxlfq_benchmark_dataset(path=path)
 
 
 def create_toy_dataset()->Dataset:

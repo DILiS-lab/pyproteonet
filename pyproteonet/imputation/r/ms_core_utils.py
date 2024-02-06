@@ -1,6 +1,7 @@
 from typing import Optional
 from functools import lru_cache
 
+import pandas as pd
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
@@ -8,6 +9,9 @@ from rpy2.robjects import numpy2ri
 
 from ...data.dataset import Dataset
 from ...utils.pandas import matrix_to_multiindex
+
+MSCORE_IMPUTATION_METHODS = ['MLE', 'bpca', 'knn', 'QRILC', 'MinDet', 'MinProb', 'min', 'zero', 'mixed', 'nbavg']
+SUPPORTED_IMPUTATION_METHODS = ['MLE', 'QRILC', 'MinDet', 'MinProb', 'min', 'zero']
 
 def _init():
     if not robjects.r('"BiocManager" %in% rownames(installed.packages())')[0]:
@@ -26,7 +30,7 @@ def _init():
 
 def impute_ms_core_utils(dataset: Dataset, molecule: str, column: str, method: str, result_column: Optional[str] = None,**kwargs):
     """Apply any imputation function implemented by the MsCoreUtils package to a dataset.
-       Imputation methods implemented by MsCoreUtils are: MLE, bpca, knn, QILC, MinDet, MinProb, min, zero, mixed, nbavg, with
+       Currently supported imputation methods implemented by MsCoreUtils are: QILC, MinDet, MinProb, min, zero
        See https://rdrr.io/bioc/MsCoreUtils/man/imputation.html for more details.
 
         Args:
@@ -40,9 +44,10 @@ def impute_ms_core_utils(dataset: Dataset, molecule: str, column: str, method: s
     """
     ms_core_utils = _init()
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
-    with (robjects.default_converter + pandas2ri.converter).context():
-        res = ms_core_utils.impute_matrix(mat, method = method, **kwargs)
-    res.index = res.index.astype(mat.index.dtype)#R transforms indices to str for some reason
+    mat_np = mat.to_numpy()
+    with (robjects.default_converter + pandas2ri.converter + numpy2ri.converter).context():
+        res = ms_core_utils.impute_matrix(mat_np, method = method, **kwargs)
+    res = pd.DataFrame(data=res, index=mat.index, columns=mat.columns)
     if result_column is not None:
-        dataset.set_samples_value_matrix(matrix=res, molecule=molecule, column=result_column)
+        dataset.set_wf(matrix=res, molecule=molecule, column=result_column)
     return matrix_to_multiindex(res)

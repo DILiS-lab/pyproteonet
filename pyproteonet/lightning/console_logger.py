@@ -32,7 +32,7 @@ class ConsoleLogger(Logger):
     def log_metrics(self, metrics, step):
         print_line = f"step{step}: "
         for name, value in metrics.items():
-            print_line += f"{name}:{value} || "
+            print_line += f"{name}:{value:.3f} || "
         print(print_line)
         if self.keep_dict:
             for metric_name, metric_value in metrics.items():

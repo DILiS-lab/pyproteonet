@@ -7,40 +7,7 @@ import h5py
 
 from ..data import MoleculeSet, Dataset
 
-def load_alphapept_result(
-    base_path: Union[str, Path],
-    value_fields: List[str] = ['ms1_int_sum_apex'],
-    molecules: Union[Dict[str, str], List[str]]={'protein_group':'protein_group', 'sequence':'peptide'},
-    mappings: List[Tuple[str, str]] = [('protein_group', 'sequence')],
-    skip_decoys: bool=True,
-    keep_razor_mapping: bool=True,
-)->Dataset:
-    base_path = Path(base_path)
-    database = h5py.File(base_path / "database.hdf", "r")
-    protein_fdr = pd.read_hdf(base_path / "results.hdf", "protein_fdr")
-    if skip_decoys:
-        protein_fdr = protein_fdr[~protein_fdr.decoy]
-    sequences = np.array(database["peptides"]["sequences"])
-    prot_indices = np.array(database["peptides"]["protein_indices"])
-    db_pointers = np.array(database["peptides"]["protein_indptr"])
-    prots = pd.Series(database["proteins"]["name"]).iloc[prot_indices].astype(str).reset_index(drop=True)
-    pep_pointers, prot_pointers = [], []
-    for i in range(len(sequences)):
-        target_prots = range(db_pointers[i], db_pointers[i + 1])
-        prot_pointers.extend(target_prots)
-        pep_pointers.extend([i] * len(target_prots))
-    pep_prot_mapping = pd.DataFrame({"id": sequences[pep_pointers].astype(str), "map_id": prots.iloc[prot_pointers]})
-
-    molecule_dfs = {}
-    if isinstance(molecules, (list, tuple)):
-        molecules = {mol:mol for mol in molecules}
-    for mol, name in molecules.item():
-        molecules[name] = pd.DataFrame(index = protein_fdr[mol].unique)
-    for mapping in mappings:
-        if 'protein_group' in mapping:
-            pass
-    #TODO: WIP
-
+#TODO: this function is not properly tested and maintained, should either be improved or removed
 def load_alphapept_result(
     base_path: Union[str, Path],
     peptide_id_field: str="sequence",
@@ -107,7 +74,6 @@ def load_alphapept_result(
         assert (groups["protein_group"].nunique() == 1).all()
         peptides["protein_group"] = groups["protein_group"].first()
 
-    #prot_mapping = pd.DataFrame({"id": protein_groups.to_numpy(), "map_id": protein_groups.to_numpy()})
     pep_mapping = pep_prot_mapping[pep_prot_mapping["map_id"].isin(protein_to_group_mapping.index)]
     if peptide_id_field != "sequence":
         assert (groups["sequence"].nunique() == 1).all()
@@ -132,7 +98,6 @@ def load_alphapept_result(
     if keep_razor_mapping:
         razor_mapping = peptides.reset_index().rename(columns={peptide_id_field: "peptide"})
         razor_mapping.set_index(['protein_group', 'peptide'], drop=True, inplace=True)
-        #razor_mapping = {"protein_group": prot_mapping.copy(), "peptide": razor_mapping}
         mappings["razor"] = razor_mapping
     ms = MoleculeSet(molecules=molecules, mappings=mappings)
     ds = Dataset(molecule_set=ms)

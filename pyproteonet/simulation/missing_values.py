@@ -126,8 +126,8 @@ def simulate_mcars_sample(
 def simulate_mcars(
     dataset: Dataset,
     amount: Union[int, float],
-    molecule: str = "peptide",
-    column: str = "abundance",
+    molecule: str,
+    column: str,
     result_column: Optional[str] = None,
     mask_column: Optional[str] = None,
     rng: Optional[Generator] = None,

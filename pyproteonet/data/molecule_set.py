@@ -99,7 +99,7 @@ class MoleculeMapping:
             .all()
         ):
             raise KeyError(
-                "The mapping contains molecule indices for mapping molecule 2 which are not in the MoleculeSet !"
+                f"The mapping contains molecule indices for mapping molecule 2 ({self.mapping_molecules[1]}) which are not in the MoleculeSet !"
             )
         if not self.df.index.is_unique:
             raise AttributeError("The mapping index is not unique!")

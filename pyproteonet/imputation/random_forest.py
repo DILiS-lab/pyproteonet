@@ -38,7 +38,7 @@ def random_forest_impute(
         col[col.isna()] = col_means[c]
 
     if result_column is not None:
-        dataset.set_samples_value_matrix(molecule=molecule, column=result_column, matrix=matrix)
+        dataset.set_wf(molecule=molecule, column=result_column, matrix=matrix)
     
     vals = matrix.stack().swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)

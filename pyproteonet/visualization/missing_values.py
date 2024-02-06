@@ -15,7 +15,7 @@ def plot_missing_distribution(dataset: Dataset, molecule: str, column: str, ax: 
         fig, ax = plt.subplots(figsize=(14,3))
     sns.barplot(x=pep_missingness.index, y=pep_missingness, ax=ax)
     ax.bar_label(ax.containers[0], fmt='%.2f', rotation=90)
-    ax.set_xlabel('Number Missing Sample Values per Peptide')
+    ax.set_xlabel('Number Missing Sample Values per Molecule')
     ax.set_ylabel('%')
     ax.set_ylim(0, pep_missingness.max() + 10)
     ax.text(pep_mat.shape[1] / 2, pep_missingness.max() + 5, horizontalalignment='center',

@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Tuple
+from typing import List, Optional, Tuple
 from typing import List
 
 import numpy as np
@@ -13,7 +13,7 @@ from dgl.nn.pytorch.conv import GATConv, GATv2Conv
 from ....lightning.abstract_node_imputer import AbstractNodeImputer
 from ....lightning.training_early_stopping import TrainingEarlyStopping
 from ....data.dataset import Dataset
-from ....normalization.dnn_normalizer import DnnNormalizer
+from ....processing.standardizer import Standardizer
 
 
 from torch.utils.data import DataLoader
@@ -23,7 +23,7 @@ from pyproteonet.lightning import ConsoleLogger
 from dgl.dataloading import GraphCollator
 
 from ....data.dataset import Dataset
-from ....data.masked_dataset import MaskedDataset
+from ....masking.masked_dataset import MaskedDataset
 from ....masking.masked_dataset_generator import MaskedDatasetGenerator
 from ....dgl.collate import (
     masked_dataset_to_homogeneous_graph,
@@ -100,8 +100,6 @@ class UncertaintyGAT(torch.nn.Module):
             return torch.cat(h_concat, axis=-1)
 
     def forward(self, graph, feat, eweight=None):
-        # graph = dgl.to_homogeneous(graph, ndata = ['x'])
-        # feat = feat['molecule']
         if self.embedding is not None:
             feat = torch.cat((self.embedding(graph.ndata[dgl.NID].int()), feat), dim=-1)
         feat = self.initial_layers(feat)
@@ -136,7 +134,6 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         embedding_dim: Optional[int] = None,
         average_heads: bool = False
     ):
-        #print(out_dim)
         super().__init__(
             nan_substitute_value=nan_substitute_value,
             mask_substitute_value=mask_substitute_value,
@@ -144,7 +141,6 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
             lr=lr,
         )
         self._out_dim = out_dim
-        #print(num_embeddings, embedding_dim)
         self._model = UncertaintyGAT(
             in_dim=in_dim,
             heads=heads,
@@ -165,15 +161,12 @@ class UncertaintyGatNodeImputer(AbstractNodeImputer):
         batch_size = 1  # TODO
         uncertainty = y[:, 1]
         y = y[:, 0]
-        # if self.out_dim > 1:
-        #    y = y[:, :, :self.num_abundance_features]
         mae = F.l1_loss(y, target).item()
         mse = F.mse_loss(y, target).item()
-        # pearson = (torch.corrcoef(torch.t(torch.cat((y, target), -1)))[0, 1]).item()
         y, target = (
             y.squeeze(),
             target.squeeze(),
-        )  # TODO look why this is necessary when training on singe samples
+        )  # TODO find a more elegant way to handle training on single samples
         pearson = (torch.corrcoef(torch.t(torch.stack((y, target), -1)))[0, 1]).item()
         self.log(f"{prefix}_pearson", pearson, batch_size=batch_size)
         self.log(f"{prefix}_r2", pearson**2, batch_size=batch_size)
@@ -324,49 +317,18 @@ def impute_homogeneous_gnn(
     for i, col in enumerate(partner_feature_columns):
         in_dataset.values[partner_molecule][f'f{i}'] = dataset.values[partner_molecule][col]
     feature_names = [f"f{i}" for i in range(len(feature_columns))]
-    normalizer = DnnNormalizer(
+    normalizer = Standardizer(
         columns=["abundance", "abundance_gt"] + feature_names, logarithmize=False
     )
-    normalizer.normalize(dataset=in_dataset, inplace=True)
-
-    # # determining the masking fraction to resemble the missing fraction of partner molecule in the dataset
-    # missing_mols = dataset.values[molecule][column]
-    # missing_mols = (
-    #     missing_mols[missing_mols.isna()].index.get_level_values("id").unique()
-    # )
-    # mapped = dataset.get_mapped(
-    #     molecule=molecule,
-    #     partner_molecule=partner_molecule,
-    #     mapping=mapping,
-    #     partner_columns=[partner_column],
-    # )
-    # mapped_missing = mapped[mapped.index.get_level_values(molecule).isin(missing_mols)]
-    # missing_fraction = (mapped_missing.isna().sum() / mapped_missing.shape[0]).item()
-    # overall_missing_fraction = dataset.values[partner_molecule][partner_column]
-    # overall_missing_fraction = overall_missing_fraction.isna().sum() / overall_missing_fraction.shape[0]
-    # # mapped_non_missing = mapped[
-    # #     ~mapped.index.get_level_values(molecule).isin(missing_mols)
-    # # ]
-    # # non_missing_fraction = (
-    # #     mapped_non_missing.isna().sum() / mapped_non_missing.shape[0]
-    # # ).item()
-    # # masking_fraction = missing_fraction - non_missing_fraction
-    # masking_fraction = missing_fraction - overall_missing_fraction
-    # partner_vals = dataset.values[partner_molecule][partner_column]
-    # masking_fraction = masking_fraction / (1 - partner_vals.isna().sum() / partner_vals.shape[0])
-    # assert masking_fraction > 0
+    normalizer.standardize(dataset=in_dataset, inplace=True)
 
     validation_ids = in_dataset.values[molecule]["abundance"]
     validation_ids = validation_ids[~validation_ids.isna()].sample(frac=0.2).index
-    # partner_validation_ids = in_dataset.values[partner_molecule]["abundance"]
-    # partner_validation_ids = (
-    #     partner_validation_ids[~partner_validation_ids.isna()].sample(frac=0.1).index
-    # )
     validation_set = MaskedDataset.from_ids(
         dataset=in_dataset,
         mask_ids={
             molecule: validation_ids
-        },  # , partner_molecule: partner_validation_ids},
+        },
     )
     if train_sample_wise:
         validation_set = [(validation_set, [s]) for s in in_dataset.sample_names]
@@ -378,32 +340,13 @@ def impute_homogeneous_gnn(
     rng = np.random.default_rng()
     def masking_fn(in_ds):
         mask_ids = {}
-        hidden_ids = {}#molecule: validation_ids}
+        hidden_ids = {}
         epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
         molecule_ids = in_ds.molecules[molecule].sample(frac=epoch_masking_fraction).index
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
         molecule_mask_ids = molecule_mask_ids[molecule_mask_ids.index.get_level_values("id").isin(molecule_ids)]
         molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()].index
-        # molecule_mask_ids = (
-        #     molecule_mask_ids#[~molecule_mask_ids.index.isin(validation_ids)]
-        #     .sample(frac=training_fraction)
-        #     .index
-        # )
         mask_ids[molecule] = molecule_mask_ids
-        molecules = molecule_mask_ids.get_level_values("id").unique()
-        # partner_molecules = (
-        #     mapping_df[mapping_df.index.get_level_values(molecule).isin(molecules)]
-        #     .index.get_level_values(partner_molecule)
-        #     .unique()
-        # )
-        # partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
-        # partner_mask_ids = partner_mask_ids[
-        #     partner_mask_ids.index.get_level_values("id").isin(partner_molecules)
-        # ]
-        # partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
-        # partner_mask_ids = partner_mask_ids.sample(  # [~partner_mask_ids.index.isin(partner_validation_ids)]
-        #     frac=masking_fraction
-        # ).index
         partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
         partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
         partner_mask_ids = partner_mask_ids.sample(frac=epoch_masking_fraction).index
@@ -470,26 +413,14 @@ def impute_homogeneous_gnn(
             gt_ds = [(gt_ds, None)]
         gt_dl = DataLoader(gt_ds, batch_size=1, collate_fn=gt_collate_fn)
         val_dls.append(gt_dl)
-        #early_stopping_monitor = "validation_loss/dataloader_idx_0"
 
     num_samples = in_dataset.num_samples
-    # heads = [num_samples, num_samples]  # [num_samples]
-    # dimensions = [8 * num_smples, 4*num_samples, 2*num_samples]
     heads = [4 * num_samples, 4 * num_samples, 4 * num_samples]
-    # heads = [8 * num_samples]
-    # dimensions = [8]
     dimensions = [
         4 * num_samples,
         4 * num_samples,
         4 * num_samples,
-    ]  # [1]#, num_samples, num_samples]
-    #print(heads)
-    #print(dimensions)
-    # module = GatNodeImputer(in_dim = num_samples + 2,
-    #                         heads=heads, gat_dims=dimensions,
-    #                         mask_substitute_value=missing_substitute_value, hide_substitute_value=missing_substitute_value,
-    #                         nan_substitute_value=missing_substitute_value,
-    #                         out_dim=num_samples, use_gatv2=use_gatv2, initial_dense_layers=[8*num_samples, num_samples])
+    ]
     module = UncertaintyGatNodeImputer(
         in_dim=1+ 2 + len(feature_names) if train_sample_wise else 2 + num_samples + num_samples * len(feature_names),
         heads=heads,
@@ -503,7 +434,7 @@ def impute_homogeneous_gnn(
             8 * num_samples,
             8 * num_samples,
             4 * num_samples,
-        ],  # [8 * num_samples, 2 * num_samples]
+        ],
         dropout=0.2,
         lr=0.001,
         num_embeddings=num_embeddings,
@@ -554,10 +485,6 @@ def impute_homogeneous_gnn(
     else:
         predict_ds = mask_missing(dataset=in_dataset, molecule_columns={molecule:'abundance'})
 
-    # pred_dl = DataLoader([(predict_ds, s) for s in in_dataset.sample_names], batch_size=1, collate_fn=collate_fn)
-    # predictions = trainer.predict(
-    #     module, dataloaders=pred_dl, ckpt_path=None
-    # )
     pred_graphs = []
     if train_sample_wise:
         sample_lists = [[s] for s in in_dataset.sample_names]
@@ -591,9 +518,8 @@ def impute_homogeneous_gnn(
         mat_pd = in_dataset.get_samples_value_matrix(molecule=molecule, column="abundance", samples=s)
         mat = mat_pd.to_numpy()
         mat[masked_molecules.numpy()] = molecule_res[masked_molecules].numpy()[:, 0]
-        # mat[:, :] = prot_res[:, :].numpy()
         mat_pd.loc[:, :] = mat
-        in_dataset.set_samples_value_matrix(
+        in_dataset.set_wf(
             matrix=mat_pd, molecule=molecule, column="abundance"
         )
         if train_on_partner and partner_result_column is not None:
@@ -607,12 +533,11 @@ def impute_homogeneous_gnn(
             mat_pd = in_dataset.get_samples_value_matrix(molecule=partner_molecule, column="abundance", samples=s)
             mat = mat_pd.to_numpy()
             mat[masked_partner_mols.numpy()] = partner_res[masked_partner_mols].numpy()[:, 0]
-            # mat[:, :] = prot_res[:, :].numpy()
             mat_pd.loc[:, :] = mat
-            in_dataset.set_samples_value_matrix(
+            in_dataset.set_wf(
                 matrix=mat_pd, molecule=partner_molecule, column="abundance"
             )
-    normalizer.unnormalize(dataset=in_dataset, inplace=True)
+    normalizer.unstandardize(dataset=in_dataset, inplace=True)
     vals = dataset.values[molecule][column]
     res_vals = in_dataset.values[molecule]["abundance"]
     vals.loc[vals.isna(), :] = res_vals.loc[vals.isna(), :]
@@ -627,7 +552,7 @@ def impute_homogeneous_gnn(
         mat[:, :] = np.nan
         mat[masked_molecules.numpy()] = molecule_res[masked_molecules].numpy()[:, 1]
         mat_pd.loc[:, :] = mat
-        dataset.set_samples_value_matrix(
+        dataset.set_wf(
             matrix=mat_pd, molecule=molecule, column=uncertainty_column
         )
     return vals

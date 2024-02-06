@@ -3,11 +3,25 @@ import random
 
 from torch.utils.data import IterableDataset
 
+from pyproteonet.masking.masked_dataset import MaskedDataset
+
 from ..data.dataset import Dataset
-from ..data.masked_dataset import MaskedDataset
 
 
 class MaskedDatasetGenerator(IterableDataset):
+    """
+    Itarable set of MaskedDatasets and sample names. The MaskedDatasets are generated from a given list of Datasets using a given generator function that takes a Dataset and returns a MaskedDataset.
+    The sample_names given with each MaskedDataset are either a list of all samples or just a single simple if sample_wise is True.
+    This can be used by a DataLoader to generate MaskedDatasets on the fly.
+
+
+    Args:
+        datasets (List[Dataset]): List of datasets to generate masked datasets from.
+        generator_fn (Callable[[Dataset], MaskedDataset]): Function that generates a masked dataset from a given dataset.
+        sample_wise (bool, optional): If True, returns each MaskedDataset num_samples times each times accompied by another sample name. If false just returns the MaskedDataset together with a list of all sample names. Defaults to False.
+        epoch_size_multiplier (int, optional): Multiplier for the number of iterations over the datasets to make up one "epoch". Defaults to 1.
+        shuffle_samplewise_samples (bool, optional): If True and sample_wise is True, shuffles the samples within each dataset. Defaults to False.
+    """
 
     def __init__(self, datasets: List[Dataset], generator_fn: Callable[[Dataset], MaskedDataset], sample_wise: bool = False, epoch_size_multiplier: int = 1, shuffle_samplewise_samples: bool = False):
         self.datasets = datasets

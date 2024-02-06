@@ -6,6 +6,6 @@ pyproteonet.data
    :template: custom-module-template.rst
    :recursive:
 
-   pyproteonet.data.Dataset
-   pyproteonet.data.DatasetSample
-   pyproteonet.data.MoleculeSet
+   pyproteonet.data.dataset
+   pyproteonet.data.dataset_sample
+   pyproteonet.data.molecule_set

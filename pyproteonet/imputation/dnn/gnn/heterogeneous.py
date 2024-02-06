@@ -20,9 +20,9 @@ from ....data.dataset import Dataset
 from ....masking.masked_dataset_generator import MaskedDatasetGenerator
 from ....lightning.console_logger import ConsoleLogger
 from ....lightning.training_early_stopping import TrainingEarlyStopping
-from ....normalization.dnn_normalizer import DnnNormalizer
+from ....processing.standardizer import Standardizer
 from ....masking.missing_values import mask_missing
-from ....data.masked_dataset import MaskedDataset
+from ....masking.masked_dataset import MaskedDataset
 
 class ImputationModule(L.LightningModule):
     def __init__(
@@ -61,7 +61,7 @@ class ImputationModule(L.LightningModule):
                 dense_layers.append(nn.Dropout(p=dropout))
                 dense_layers.append(nn.LeakyReLU())
                 last_dim = dim
-            dense_layers.append(nn.Linear(last_dim, 2 * in_dim))
+            dense_layers.append(nn.Linear(last_dim, fc_out_dim))
         self.molecule_fc_model = nn.Sequential(*dense_layers_molecule)
         self.partner_fc_model = nn.Sequential(*dense_layers_partner)
         self.molecule_gat = HeteroGraphConv(
@@ -105,7 +105,6 @@ class ImputationModule(L.LightningModule):
         self.mask_value = mask_value
 
     def forward(self, graph):
-        # inverse_graph = graph.reverse()
         abundance = graph.ndata["abundance"]
         hidden = graph.ndata["hidden"]
         for key, hide in hidden.items():
@@ -116,8 +115,6 @@ class ImputationModule(L.LightningModule):
         for key, ab in abundance.items():
             ab[torch.isnan(ab)] = self.mask_value
         partner_inputs = abundance[self.partner_molecule]
-        # if self.embedding is not None:
-        #     molecule_inputs = torch.cat((self.embedding(graph.nodes(self.molecule).int()), molecule_inputs), dim=-1)
         partner_fc_vec = self.partner_fc_model(partner_inputs)
         molecule_fc_vec = self.molecule_fc_model(self.embedding(graph.nodes(self.molecule).int()))
         mol_vec = nn.functional.leaky_relu(
@@ -129,9 +126,6 @@ class ImputationModule(L.LightningModule):
         mol_vec = nn.functional.leaky_relu(
             self.molecule_gat2(graph, ({self.partner_molecule:partner_vec}, {self.molecule:mol_vec}))[self.molecule].mean(dim=-2)
         )
-        # output = output.view(output.shape[0], -1)
-        # reshape molecule vector
-        #mol_vec = torch.cat((mol_vec, molecule_fc_vec), dim=-1)
         mol_vec = self.molecule_linear(mol_vec)
         mol_shape = list(mol_vec.shape)
         mol_shape[-1] = int(mol_shape[-1] / 2)
@@ -169,14 +163,8 @@ class ImputationModule(L.LightningModule):
         mol_vec, partner_vec = self(graph)
         mol_pred = mol_vec[molecule_mask][:, 0]
         partner_pred = partner_vec[partner_mask][:, 0]
-        var_cap = torch.tensor([10], device=partner_vec.device, dtype=partner_vec.dtype)
-        #print((torch.exp(partner_vec[partner_mask][:, 1])>10).sum().item())
-        #print((torch.exp(mol_vec[molecule_mask][:, 1])>10).sum().item())
         partner_var = torch.exp(partner_vec[partner_mask][:, 1])
-        #partner_vec = torch.min(partner_vec, var_cap)
         mol_var = torch.exp(mol_vec[molecule_mask][:, 1])
-        #mol_vec = torch.min(mol_vec, var_cap)
-        # loss = torch.nn.functional.mse_loss(output, inputs.mean(dim=-1, keepdim=True))
         self.log("num_masked_molecule", num_masked_molecule.item(), on_step=False, on_epoch=True, batch_size=1)
         self.log("num_masked_partner", num_masked_partner.item(), on_step=False, on_epoch=True, batch_size=1)
         molecule_loss_coefficient = 1
@@ -191,11 +179,7 @@ class ImputationModule(L.LightningModule):
             )
             loss += partner_loss
             self.log("partner_loss", partner_loss.item(), on_step=False, on_epoch=True, batch_size=1)
-        loss_thresh = torch.max(partner_target.max(), mol_target.max())
-        # if loss.item() > loss_thresh.item():
-        #     print(f"attention exploding loss: {loss.item()}")
         loss = torch.min(loss, torch.max(partner_target.max(), mol_target.max()))
-        #print(loss.item())
         return loss
 
     def training_step(self, graph, batch_idx):
@@ -242,10 +226,9 @@ def impute_heterogeneous_gnn(
     early_stopping_patience: int = 7,
     logger: Optional[Logger] = None,
     epoch_size: int = 30,
-    masking_seed: Optional[int] = None,
     missing_substitute_value: int = -2
 ) -> pd.Series:
-    """Impute missing values using a homogenous graph neural network applied on the molecule graph created from two molecule types like proteins and their assigned peptides.
+    """Impute missing values using a heterogeneous graph neural network applied on the molecule graph created from two molecule types like proteins and their assigned peptides.
 
     Args:
         dataset (Dataset): The dataset to impute.
@@ -264,7 +247,6 @@ def impute_heterogeneous_gnn(
         early_stopping_patience (int, optional): Number of epochs after which the training is stopped if the training loss does not improve. Defaults to 7.
         logger (Optional[Logger], optional): The lightning logger used for logging. If not given logs will be printed to consose. Defaults to None.
         epoch_size (int, optional): Number of training runs on the dataset that make up an epoch. Defaults to 30.
-        masking_seed (Optional[int], optional): If given this seed is used to seed the random generator for randomly masking molecule values during training. Defaults to None.
         missing_substitute_value (float, optional): Value to replace missing or masked values with. Defaults to -3.
     Returns:
         pd.Series: the imputed values.
@@ -277,36 +259,6 @@ def impute_heterogeneous_gnn(
             log_every_n_steps = dataset.num_samples
         else:
             log_every_n_steps = 1
-    
-    # #determining the masking fraction to resemble the missing fraction of partner molecule in the dataset
-    # missing_mols = dataset.values[molecule][column]
-    # missing_mols = (
-    #     missing_mols[missing_mols.isna()].index.get_level_values("id").unique()
-    # )
-    # mapped = dataset.get_mapped(
-    #     molecule=molecule,
-    #     partner_molecule=partner_molecule,
-    #     mapping=mapping,
-    #     partner_columns=[partner_column],
-    # )
-    # mapped_missing = mapped[mapped.index.get_level_values(molecule).isin(missing_mols)]
-    # missing_fraction = mapped_missing[partner_column].isna().sum() / mapped_missing.shape[0]
-    # overall_missing_fraction = mapped[partner_column].isna().sum() / mapped.shape[0]
-    # # mapped_non_missing = mapped[
-    # #     ~mapped.index.get_level_values(molecule).isin(missing_mols)
-    # # ]
-    # # non_missing_fraction = (
-    # #     mapped_non_missing.isna().sum() / mapped_non_missing.shape[0]
-    # # ).item()
-    # # masking_fraction = missing_fraction - non_missing_fraction
-    # masking_fraction = missing_fraction - overall_missing_fraction
-    # partner_vals = dataset.values[partner_molecule][partner_column]
-    # masking_fraction = masking_fraction / (1 - partner_vals.isna().sum() / partner_vals.shape[0])
-    # assert masking_fraction > 0
-    # #masking_fraction = training_fraction
-    # print(f"masking_fraction: {masking_fraction}")
-
-
 
     ds = dataset.copy(columns={molecule: [column],
                                partner_molecule: [partner_column]})
@@ -317,43 +269,28 @@ def impute_heterogeneous_gnn(
         },
         inplace=True,
     )
-    normalizer = DnnNormalizer(columns=["abundance"])
-    normalizer.normalize(dataset=ds, inplace=True)
+    normalizer = Standardizer(columns=["abundance"])
+    normalizer.standardize(dataset=ds, inplace=True)
 
-    validation_ids = ds.values[molecule]["abundance"]
-    validation_ids = validation_ids[~validation_ids.isna()].sample(frac=0.2).index
-    partner_validation_ids = ds.values[partner_molecule]["abundance"]
-    partner_validation_ids = (
-        partner_validation_ids[~partner_validation_ids.isna()].sample(frac=0.1).index
-    )
-    validation_set = MaskedDataset.from_ids(
-        dataset=ds,
-        mask_ids={molecule: validation_ids}#, partner_molecule: partner_validation_ids},
-    )
+    # validation_ids = ds.values[molecule]["abundance"]
+    # validation_ids = validation_ids[~validation_ids.isna()].sample(frac=0.2).index
+    # partner_validation_ids = ds.values[partner_molecule]["abundance"]
+    # partner_validation_ids = (
+    #     partner_validation_ids[~partner_validation_ids.isna()].sample(frac=0.1).index
+    # )
+    # validation_set = MaskedDataset.from_ids(
+    #     dataset=ds,
+    #     mask_ids={molecule: validation_ids}#, partner_molecule: partner_validation_ids},
+    # )
     mapping_df = ds.mappings[mapping].df
     partner_mask_ids = ds.values[partner_molecule]["abundance"]
     partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(mapping_df.index.get_level_values(partner_molecule).unique())]
     partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
-    if masking_seed is None:
-        masking_seed = random.randint(0, 1000000000)
-    print(f"seed: {masking_seed}")
-    rng = np.random.default_rng(masking_seed)
     def masking_fn(in_ds):
+        rng = np.random.default_rng()
         epoch_masking_fraction = rng.uniform(0.5 * training_fraction, 1.5 * training_fraction)
-        molecule_ids = in_ds.molecules[molecule].sample(frac=epoch_masking_fraction).index
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
-        #molecule_mask_ids = molecule_mask_ids[molecule_mask_ids.index.get_level_values('id').isin(molecule_ids)]
         molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()].index
-        # molecule_mask_ids = (
-        #     molecule_mask_ids#[~molecule_mask_ids.index.isin(validation_ids)]
-        #     .sample(frac=training_fraction)
-        #     .index
-        # )
-        #molecules = molecule_mask_ids.get_level_values('id').unique()
-        #partner_molecules = mapping_df[mapping_df.index.get_level_values(molecule).isin(molecules)].index.get_level_values(partner_molecule).unique()
-        #partner_mask_ids = in_ds.values[partner_molecule]["abundance"]
-        # partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(partner_molecules)]
-        #partner_mask_ids = partner_mask_ids[~partner_mask_ids.isna()]
         partner_ids = (
             partner_mask_ids#[~partner_mask_ids.index.isin(partner_validation_ids)]
             .sample(frac=epoch_masking_fraction)
@@ -362,7 +299,6 @@ def impute_heterogeneous_gnn(
         return MaskedDataset.from_ids(
             dataset=in_ds,
             mask_ids={molecule: molecule_mask_ids, partner_molecule: partner_ids},
-            #hidden_ids={molecule: validation_ids}#, partner_molecule: partner_validation_ids},
         )
 
     mask_ds = MaskedDatasetGenerator(datasets=[ds], generator_fn=masking_fn, sample_wise=train_sample_wise, epoch_size_multiplier=epoch_size)
@@ -388,16 +324,11 @@ def impute_heterogeneous_gnn(
     train_dl = DataLoader(mask_ds, batch_size=1, collate_fn=collate)
     graph = list(train_dl)[0]
     num_embeddings = int(graph.num_nodes(ntype=molecule))
-    if train_sample_wise:
-        validation_dl = DataLoader([(validation_set, [s]) for s in ds.sample_names], batch_size=1, collate_fn=collate)
-    else:
-        validation_dl = DataLoader([(validation_set, None)], batch_size=1, collate_fn=collate)
+    # if train_sample_wise:
+    #     validation_dl = DataLoader([(validation_set, [s]) for s in ds.sample_names], batch_size=1, collate_fn=collate)
+    # else:
+    #     validation_dl = DataLoader([(validation_set, None)], batch_size=1, collate_fn=collate)
 
-    # if molecule_coefficient is None:
-    #     molecule_coefficient = 1
-    # if partner_coefficient is None:
-    #     partner_coefficient = ((~ds.values[molecule]["abundance"].isna()).sum() * training_fraction) / ((~ds.values[partner_molecule]['abundance'].isna()).sum() * masking_fraction)
-    #print(f"molecule_coefficient: {molecule_coefficient}, partner_coefficient: {partner_coefficient}")
     num_samples = dataset.num_samples
     in_dim = 1 if train_sample_wise else num_samples
     model = ImputationModule(
@@ -408,8 +339,6 @@ def impute_heterogeneous_gnn(
         layers=[8 * num_samples, 8 * num_samples, 4 * num_samples],
         gat_heads=2 * num_samples,
         gat_dim=4 * num_samples,
-        # molecule_loss_coefficent=molecule_coefficient,
-        # partner_loss_coefficent=partner_coefficient,
         dropout=0.1,
         lr=0.001,
         num_embeddings=num_embeddings,
@@ -475,7 +404,7 @@ def impute_heterogeneous_gnn(
             only_set_masked=True, samples=s
         )
 
-    normalizer.unnormalize(dataset=ds, inplace=True)
+    normalizer.unstandardize(dataset=ds, inplace=True)
 
     res_molecule = dataset.values[molecule][column]
     res_partner = dataset.values[partner_molecule][column]

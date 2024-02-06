@@ -251,7 +251,7 @@ def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, m
         res = math.e ** res
     res_mat.loc[group_ids, :] = res
     if result_column is not None:
-        dataset.set_samples_value_matrix(matrix=res_mat, molecule=molecule, column=result_column)
+        dataset.set_wf(matrix=res_mat, molecule=molecule, column=result_column)
     vals = res_mat.stack().swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)
     return vals

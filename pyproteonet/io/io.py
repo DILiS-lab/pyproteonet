@@ -24,6 +24,23 @@ def read_mapped_dataframe(
     mapping_molecule: str = "protein",
     mapping_name="peptide-protein",
 ) -> Dataset:
+    """
+    Reads a dataframe containing a mapping as column with comma separated ids of the mapped molecule.
+
+    Args:
+        df (pd.DataFrame): The input dataframe.
+        molecule (str): The name of the molecule column in the dataframe.
+        sample_columns (List[str]): The list of sample columns in the dataframe.
+        id_column (Optional[str], optional): The name of the ID column in the dataframe. Defaults to None.
+        result_column_name (str, optional): The name of the result column in the dataframe. Defaults to "abundance".
+        mapping_column (Optional[str], optional): The name of the mapping column in the dataframe. Defaults to None.
+        mapping_sep (str, optional): The separator used in the mapping column. Defaults to ",".
+        mapping_molecule (str, optional): The name of the molecule in the mapping column. Defaults to "protein".
+        mapping_name (str, optional): The name of the mapping. Defaults to "peptide-protein".
+
+    Returns:
+        Dataset: The converted Dataset object.
+    """
     if id_column is None:
         mols = df.loc[:, []].copy()
         mols.index.name = 'id'
@@ -47,7 +64,7 @@ def read_mapped_dataframe(
     return dataset
 
 
-def read_dataset_pandas(
+def read_multiple_mapped_dataframes(
     dfs: Dict[str, pd.DataFrame],
     sample_columns: List[str],
     molecule_columns: Union[List[str], Dict[str, List[str]]] = [],
@@ -58,6 +75,20 @@ def read_dataset_pandas(
     mapping_sep=",",
     value_name="abundance",
 ) -> Dataset:
+    """
+    Reads multiple mapped dataframes each containing a mapping column with lists of ids of mapped molecules.
+
+    Args:
+        dfs (Dict[str, pd.DataFrame]): A dictionary of dataframes, where the keys represent the molecule names and the values represent the dataframes.
+        sample_columns (List[str]): A list of column names representing the samples.
+        molecule_columns (Union[List[str], Dict[str, List[str]]], optional): The column names representing the non-sample-specific molecule columns (e.g. sequence). It can be a list if the same columns are used for all molecules, or a dictionary if different columns are used for different molecules. Defaults to an empty list.
+        mappings (Union[List[Tuple[Tuple[str, str], Tuple[str, str]]], Dict[str, Tuple[Tuple[str, str], Tuple[str, str]]]], optional): The mappings between molecules. It can be a list of tuples or a dictionary from mapping name to tuple. Each tuple represents a mapping given by two tuples, each of which contains the key of the dataframe and the name of the mapping column (ids from both mapping columns are matched to find the mapped molecules) . Defaults to an empty list.
+        mapping_sep (str, optional): The separator used in the mapping columns to separed ids. Defaults to ",".
+        value_name (str, optional): The name of the create value column. Defaults to "abundance".
+
+    Returns:
+        Dataset: A Dataset object.
+    """
     if isinstance(molecule_columns, list):
         molecule_columns = {mol: molecule_columns for mol in dfs.keys()}
     if isinstance(mappings, list):

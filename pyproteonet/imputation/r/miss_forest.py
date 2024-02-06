@@ -3,11 +3,9 @@ from functools import lru_cache
 
 from rpy2 import robjects
 from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
 from rpy2.robjects import numpy2ri
 
 import numpy as np
-import pandas as pd
 from ...data.dataset import Dataset
 
 @lru_cache(maxsize=1)
@@ -75,7 +73,7 @@ def miss_forest_impute(
         col[col.isna()] = col_means[c]
 
     if result_column is not None:
-        dataset.set_samples_value_matrix(molecule=molecule, column=result_column, matrix=matrix)
+        dataset.set_wf(molecule=molecule, column=result_column, matrix=matrix)
     
     vals = matrix.stack().swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)

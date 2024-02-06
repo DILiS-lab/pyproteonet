@@ -15,8 +15,8 @@ def molecule_set_from_degree_distribution(molecule1_degree_distribution: List[in
                                           molecule1_name: str = 'protein', molecule2_name: str = 'peptide',
                                           mapping_name: str = 'peptide-protein', random_seed: Optional[int] = None)->MoleculeSet:
     rng = get_numpy_random_generator(seed=random_seed)
-    molecule1_degree_distribution = molecule1_degree_distribution.astype(int)
-    molecule2_degree_distribution = molecule2_degree_distribution.astype(int)
+    molecule1_degree_distribution = np.array(molecule1_degree_distribution).astype(int)
+    molecule2_degree_distribution = np.array(molecule2_degree_distribution).astype(int)
     num_m1_edges = (np.arange(len(molecule1_degree_distribution)) * molecule1_degree_distribution).sum()
     num_m2_edges = (np.arange(len(molecule2_degree_distribution)) * molecule2_degree_distribution).sum()
     if num_m1_edges != num_m2_edges:

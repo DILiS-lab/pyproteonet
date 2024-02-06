@@ -144,7 +144,7 @@ def partner_top_n_mean(
     if is_log:
         res = np.log(res)
     if result_column is not None:
-        dataset.set_column_flat(
+        dataset.set_column_lf(
             molecule=molecule, values=res, column=result_column, fill_missing=True
         )
     return res

@@ -82,7 +82,7 @@ def impute_pca_method(
     assert mat_np.shape == mat.shape
     matrix_imputed = pd.DataFrame(mat_np, columns=mat.columns, index=mat.index)
     if result_column is not None:
-        dataset.set_samples_value_matrix(matrix=matrix_imputed, molecule=molecule, column=result_column)
+        dataset.set_wf(matrix=matrix_imputed, molecule=molecule, column=result_column)
     vals = matrix_imputed.stack().swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)
     return vals
@@ -124,7 +124,7 @@ def impute_local_least_squares(
     assert mat.shape == res.shape
     matrix_imputed = pd.DataFrame(res, columns=mat.columns, index=mat.index)
     if result_column is not None:
-        dataset.set_samples_value_matrix(matrix=matrix_imputed, molecule=molecule, column=result_column)
+        dataset.set_wf(matrix=matrix_imputed, molecule=molecule, column=result_column)
     vals = matrix_imputed.stack().swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)
     return vals

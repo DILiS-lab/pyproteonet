@@ -37,5 +37,5 @@ def min_prob_impute(dataset: Dataset, molecule: str, column: str, q:float=0.01, 
         res = r_min_prob(mat, q=q, tune_sigma=tune_sigma)
     res.index = res.index.astype(mat.index.dtype)#R transforms indices to str for some reason
     if result_column is not None:
-        dataset.set_samples_value_matrix(matrix=res, molecule=molecule, column=result_column)
+        dataset.set_wf(matrix=res, molecule=molecule, column=result_column)
     return matrix_to_multiindex(res)
