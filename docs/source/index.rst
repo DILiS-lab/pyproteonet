@@ -3,23 +3,24 @@
 Welcome to PyProteoNet's documentation!
 =======================================
 
-**PyProteoNet** is a Python package for imputation, peptide-to-protein aggregation 
-as well as in silico data creation of proteomics data with 
-a specific focus on the development and evaluation of imputation methods for proteomics.
-Mass spectrometry experiments are represented by a set of molecules.
-Generally those molecules are proteins and peptides. 
-However, the underlying data structures allow for arbitrary molecule types
-such that additional measurements like mRNA can also be supported.
-Molecules and their relations are represented by a graph structure.
-For example for a regular MS experiment measuring peptide abundances
-which are then aggregated into protein abundances this results in a graph with proteins
-and peptides as nodes where every peptide is connected via an edge to all proteins it can
-be found in.
-One big advantage of this graph structure is the quantifiction and imputation of proteins
-by taking peptide-to-protein relations into account. From a technical point of view this
-is achived by training a graph neural network (GNN)
-for protein quantification and imputation. 
+**PyProteoNet** is a Python package for imputation, (peptide-to-protein) aggregation/summarization 
+as well as in silico data generation of proteomics data with a specific focus on the 
+development and evaluation of imputation methods for proteomics datasets.
 
+Datasets are given by a set of interrelated molecules with assigned (abundance) values for multiple samples.
+Values are structured in value columns allowing the representation and comparison of multiple measurements per molecule and sample 
+(e.g. measured and imputed abundance values).
+While the focus is on datasets consisting of interrelated proteins and peptides as commonly used in proteomics, 
+the underlying data structures allow for arbitrary molecule types such that additional measurements like mRNA can be incorporated.
+
+Explicitely modeling the relations between different molecules (e.g. proteins and peptides) as well as providing 
+a range of common aggregation as well as imputation methods together with proteomics specific evaluation metrics 
+PyProteoNet is a one-stop shop for applying and benchmarking aggregation and imputation methods for proteomics datasets.
+
+In addition, new imputation methods can be implemented and benchmarked in PyPoteoNet. 
+To this end, PyProteoNet provides functions to transform proteomics dataset into a graph representation as defined by the Deep Graph Library (DGL).
+This allows for the development and integration of new proteomics-specific imputation methods based on graph neural networks (GNNs).
+While two reference GNN-based imputation methods are already implemented, PyProteoNet aim is to provide a plattform for the development of new methods.
 
 Installation
 ============
