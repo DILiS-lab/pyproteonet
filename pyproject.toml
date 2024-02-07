@@ -32,6 +32,7 @@ dependencies = [
     "fastai",
     "omegaconf",
     "mrmr-selection",
+    "h5py",
 ]
 [dev-dependencies]
 test = [
