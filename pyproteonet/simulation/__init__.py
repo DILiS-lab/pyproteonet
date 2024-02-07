@@ -5,3 +5,5 @@ from .missing_values import simulate_mcars, simulate_mnars_thresholding
 from .protein_peptide import simulate_protein_peptide_dataset
 from .mock import ProteinPeptideDatasetMocker
 from .molecule_set import molecule_set_from_degree_distribution
+from .condition import introduce_random_condition
+from .condition import add_simulated_condition

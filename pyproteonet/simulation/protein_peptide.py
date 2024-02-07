@@ -2,11 +2,13 @@ from typing import List, Union, Optional, Iterable
 
 import numpy as np
 
+from .condition import introduce_random_condition
+
 from .utils import get_numpy_random_generator
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
 from .sampling import draw_normal_log_space
-from .modification import per_molecule_random_scaling, introduce_random_condition
+from .modification import per_molecule_random_scaling
 from .random_error import multiply_exponential_gaussian, add_positive_gaussian, poisson_error
 from pyproteonet.aggregation.partner_summarization import partner_aggregation
 
