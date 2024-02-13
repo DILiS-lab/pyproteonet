@@ -3,12 +3,11 @@ from typing import Optional, Union
 import numpy as np
 from numpy.random import Generator
 
-from .utils import get_numpy_random_generator
 from ..data.dataset import Dataset
 from ..data.dataset_sample import DatasetSample
 
 
-def simulate_mnars_thresholding_sample(
+def _simulate_mnars_thresholding_sample(
     sample: DatasetSample,
     thresh_mean: float,
     thresh_std: float,
@@ -73,7 +72,7 @@ def simulate_mnars_thresholding(
     if not inplace:
         dataset = dataset.copy()
     return dataset.sample_apply(
-        fn=simulate_mnars_thresholding_sample,
+        fn=_simulate_mnars_thresholding_sample,
         thresh_mean=thresh_mu,
         thresh_std=thresh_sigma,
         molecule=molecule,
@@ -85,7 +84,7 @@ def simulate_mnars_thresholding(
     )
 
 
-def simulate_mcars_sample(
+def _simulate_mcars_sample(
     sample: DatasetSample,
     amount: Union[int, float],
     molecule: str = "peptide",
@@ -155,7 +154,7 @@ def simulate_mcars(
     if not inplace:
         dataset = dataset.copy()
     return dataset.sample_apply(
-        simulate_mcars_sample,
+        _simulate_mcars_sample,
         amount=amount,
         molecule=molecule,
         column=column,
@@ -166,7 +165,7 @@ def simulate_mcars(
     )
 
 
-def simulate_mnars_mcars_lazar_sample(
+def _simulate_mnars_mcars_lazar_sample(
     sample: DatasetSample,
     alpha=0.5,
     beta=0.8,
@@ -181,7 +180,7 @@ def simulate_mnars_mcars_lazar_sample(
     peptide_values = sample.values["peptide"]
     peptides = peptide_values.abundance.to_numpy()
     if use_log_space:
-        # assert (peptides > 0).all()
+        assert (peptides > 0).all()
         peptides = np.log(peptides)
     num_peptide_measures = peptides.shape[0]
     mnar_thresh_mean = np.quantile(peptides, alpha)
@@ -204,21 +203,34 @@ def simulate_mnars_mcars_lazar(
     alpha=0.5,
     beta=0.8,
     mnar_thresh_std=0.01,
-    missing_value=0,
     use_log_space: bool = False,
     random_seed=None,
     inplace: bool = False,
 ):
+    """
+    Simulates both MCAR and MNAR missing using the method proposed by Lazar et al. (2016) (https://pubs.acs.org/doi/pdf/10.1021/acs.jproteome.5b00981).
+
+    Args:
+        dataset (Dataset): The dataset to simulate missing values for.
+        alpha (float, optional): The alpha parameter specifying the overall rate of missing values.
+        beta (float, optional): The beta parameter specifying the MNAR ratio. Defaults to 0.8.
+        mnar_thresh_std (float, optional): The MNAR threshold standard deviation. Defaults to 0.01.
+        use_log_space (bool, optional): Whether to use log space for the simulation. Defaults to False.
+        random_seed (int, optional): The random seed for reproducibility. Defaults to None.
+        inplace (bool, optional): Whether to modify the dataset in-place or create a copy. Defaults to False.
+
+    Returns:
+        Dataset: The dataset with simulated missing values.
+    """
     rng = np.random.default_rng(random_seed)
-    dataset.missing_value = missing_value
     if not inplace:
         dataset = dataset.copy()
     return dataset.sample_apply(
-        fn=simulate_mnars_mcars_lazar_sample,
+        fn=_simulate_mnars_mcars_lazar_sample,
         alpha=alpha,
         beta=beta,
         mnar_thresh_std=mnar_thresh_std,
-        missing_value=missing_value,
+        missing_value=dataset.missing_value,
         use_log_space=use_log_space,
         rng=rng,
     )

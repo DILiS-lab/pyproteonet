@@ -6,7 +6,6 @@ from tqdm.auto import tqdm
 import scipy
 
 from .utils import get_numpy_random_generator
-from ..data.dataset_sample import DatasetSample
 from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
 

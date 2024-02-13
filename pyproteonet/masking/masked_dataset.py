@@ -28,13 +28,13 @@ class MaskedDataset():
     
     Attributes:
         dataset (Dataset): The original dataset.
-        masks (Dict[str, pd.DataFrame]): A dictionary mapping molecule names to boolean DataFrames reprenting the masks.
-        hidden (Optional[Dict[str, pd.DataFrame]]): A dictionary mapping molecule names to boolean DataFrames  reprenting hidden molecules (optional).
+        masks (Dict[str, pd.DataFrame]): A dictionary mapping molecule names to boolean DataFrames reprenting the masks. Defaults to an empty dictionary.
+        hidden (Optional[Dict[str, pd.DataFrame]]): A dictionary mapping molecule names to boolean DataFrames reprenting hidden molecules (optional). Defaults to None.
     """
     def __init__(
         self,
         dataset: Dataset,
-        masks: Dict[str, pd.DataFrame],
+        masks: Dict[str, pd.DataFrame] = {},
         hidden: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> None:
         self.dataset = dataset

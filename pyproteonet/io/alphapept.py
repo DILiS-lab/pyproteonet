@@ -7,7 +7,7 @@ import h5py
 
 from ..data import MoleculeSet, Dataset
 
-#TODO: this function is not properly tested and maintained, should either be improved or removed
+#TODO: this function is not properly tested and maintained, should either be improved or removed in the future
 def load_alphapept_result(
     base_path: Union[str, Path],
     peptide_id_field: str="sequence",

@@ -1,6 +1,5 @@
 from typing import (
     Dict,
-    Literal,
     TYPE_CHECKING,
     Callable,
     Optional,

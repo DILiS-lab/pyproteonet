@@ -272,16 +272,6 @@ def impute_heterogeneous_gnn(
     normalizer = Standardizer(columns=["abundance"])
     normalizer.standardize(dataset=ds, inplace=True)
 
-    # validation_ids = ds.values[molecule]["abundance"]
-    # validation_ids = validation_ids[~validation_ids.isna()].sample(frac=0.2).index
-    # partner_validation_ids = ds.values[partner_molecule]["abundance"]
-    # partner_validation_ids = (
-    #     partner_validation_ids[~partner_validation_ids.isna()].sample(frac=0.1).index
-    # )
-    # validation_set = MaskedDataset.from_ids(
-    #     dataset=ds,
-    #     mask_ids={molecule: validation_ids}#, partner_molecule: partner_validation_ids},
-    # )
     mapping_df = ds.mappings[mapping].df
     partner_mask_ids = ds.values[partner_molecule]["abundance"]
     partner_mask_ids = partner_mask_ids[partner_mask_ids.index.get_level_values('id').isin(mapping_df.index.get_level_values(partner_molecule).unique())]
@@ -292,7 +282,7 @@ def impute_heterogeneous_gnn(
         molecule_mask_ids = in_ds.values[molecule]["abundance"]
         molecule_mask_ids = molecule_mask_ids[~molecule_mask_ids.isna()].index
         partner_ids = (
-            partner_mask_ids#[~partner_mask_ids.index.isin(partner_validation_ids)]
+            partner_mask_ids
             .sample(frac=epoch_masking_fraction)
             .index
         )
@@ -324,10 +314,6 @@ def impute_heterogeneous_gnn(
     train_dl = DataLoader(mask_ds, batch_size=1, collate_fn=collate)
     graph = list(train_dl)[0]
     num_embeddings = int(graph.num_nodes(ntype=molecule))
-    # if train_sample_wise:
-    #     validation_dl = DataLoader([(validation_set, [s]) for s in ds.sample_names], batch_size=1, collate_fn=collate)
-    # else:
-    #     validation_dl = DataLoader([(validation_set, None)], batch_size=1, collate_fn=collate)
 
     num_samples = dataset.num_samples
     in_dim = 1 if train_sample_wise else num_samples
@@ -356,7 +342,7 @@ def impute_heterogeneous_gnn(
         callbacks=[TrainingEarlyStopping(monitor="train_loss", mode="min", patience=early_stopping_patience)],
         gradient_clip_val=1,
     )
-    trainer.fit(model=model, train_dataloaders=train_dl)#, val_dataloaders=validation_dl)
+    trainer.fit(model=model, train_dataloaders=train_dl)
 
     missing_molecule = ds.values[molecule]["abundance"]
     missing_molecule = missing_molecule[missing_molecule.isna()].index

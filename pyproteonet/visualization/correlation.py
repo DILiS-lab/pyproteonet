@@ -7,7 +7,7 @@ import seaborn as sns
 
 from ..data.dataset import Dataset
 
-def plot_sample_correlation_matrix( dataset: Dataset, molecule: str, column: str, ax: Optional[plt.Axes] = None, samples: Optional[List[str]]=None,
+def plot_sample_correlation_matrix(dataset: Dataset, molecule: str, column: str, ax: Optional[plt.Axes] = None, samples: Optional[List[str]]=None,
                                    annot=True, **kwargs):
     mat = dataset.get_samples_value_matrix(molecule=molecule, column=column)
     if samples is not None:

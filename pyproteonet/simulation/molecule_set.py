@@ -84,14 +84,12 @@ def simulate_molecule_set_protein_peptide(num_peptides = 1000, num_proteins = 10
     b_nodes_deg0 = 0
     if relative_protein_node_degrees is not None:
         num_edges = ((np.arange(len(peptide_node_degrees))) * peptide_node_degrees).sum()
-        #protein_deg_distribution = np.array(_relative_to_absolute_node_degrees(relative_protein_node_degrees, num_proteins))
         protein_deg_distribution = np.array(relative_protein_node_degrees)
         protein_deg_distribution /= protein_deg_distribution.sum()
         protein_deg_distribution *= num_edges / (protein_deg_distribution * np.arange(len(protein_deg_distribution))).sum()
         b_nodes_deg0 = round(protein_deg_distribution[0])
         protein_deg_distribution = np.array(_degree_distribution_to_integers(protein_deg_distribution), dtype=int)
         protein_deg_distribution = np.repeat(np.arange(len(protein_deg_distribution)), protein_deg_distribution).astype(float)
-        #protein_deg_distribution *= num_edges / protein_deg_distribution.sum()
         rng.shuffle(protein_deg_distribution)
     a_b = []
     start = 0
@@ -112,7 +110,6 @@ def simulate_molecule_set_protein_peptide(num_peptides = 1000, num_proteins = 10
         if protein_deg_distribution is None:
             b = rng.choice(num_proteins, size=deg, replace=False)
         else:
-            #b = np.argpartition(protein_deg_distribution, -deg)[-deg:]
             probs = protein_deg_distribution + epsilon
             probs[probs<0] = 0
             probs /= probs.sum()
@@ -122,7 +119,6 @@ def simulate_molecule_set_protein_peptide(num_peptides = 1000, num_proteins = 10
             raise ValueError()
         a_b.append(np.stack([a, b], axis=1))
     a_b = np.concatenate(a_b, axis=0)
-    #correspondences = pd.DataFrame({'peptide':a, 'protein':b})
     protein_ids = np.squeeze(np.unique(a_b[:,1]))
     start_deg_0 = protein_ids.max()+1
     protein_ids = np.concatenate([protein_ids, np.arange(start_deg_0, start_deg_0 + b_nodes_deg0)])

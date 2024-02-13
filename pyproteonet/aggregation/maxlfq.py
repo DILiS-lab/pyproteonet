@@ -7,8 +7,7 @@ import math
 
 import numba  # type: ignore
 import numpy as np
-# import numpy.typing as npt  # not used yet
-import pandas as pd  # type: ignore
+import pandas as pd
 from numba import njit, prange  # type: ignore
 from numba_progress import ProgressBar
 
@@ -252,6 +251,6 @@ def maxlfq(dataset: Dataset, molecule: str, mapping: str, partner_column: str, m
     res_mat.loc[group_ids, :] = res
     if result_column is not None:
         dataset.set_wf(matrix=res_mat, molecule=molecule, column=result_column)
-    vals = res_mat.stack().swaplevel()
+    vals = res_mat.stack(dropna=False).swaplevel()
     vals.index.set_names(["sample", "id"], inplace=True)
     return vals

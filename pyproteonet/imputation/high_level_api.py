@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 from functools import partial
+import time
 
 from pyproteonet.data import Dataset
 from tqdm.auto import tqdm
@@ -29,6 +30,7 @@ def impute_molecule(
     result_columns: Optional[List[str]] = None,
     mnar_percentile: float = 1,
     knn_k: int = 5,
+    measure_runtime: bool = True,
 ):
     """
     Imputes missing values in a specific molecule and column of a dataset using various imputation methods.
@@ -79,6 +81,7 @@ def impute_molecule(
     Returns:
         None
     """
+    runtimes = dict()
     if isinstance(methods, str):
         methods = [methods]
     if methods is None:
@@ -135,7 +138,13 @@ def impute_molecule(
         from pyproteonet.imputation.dnn.collaborative_filtering import collaborative_filtering_impute
         method_fns['cf'] = collaborative_filtering_impute
     for m, rc in tqdm(zip(methods, result_columns), total=len(methods)):
-        print(f'Imputing with methods {m}, storing results in value column {rc}')
-        dataset.values[molecule][rc] = method_fns[m](
+        print(f'Imputing with method {m}, storing results in value column {rc}')
+        runtime = time.time()
+        imp = method_fns[m](
             dataset=dataset, molecule=molecule, column=column
         )
+        runtime = time.time() - runtime
+        runtimes[m] = runtime
+        dataset.values[molecule][rc] = imp
+    if measure_runtime:
+        return runtimes

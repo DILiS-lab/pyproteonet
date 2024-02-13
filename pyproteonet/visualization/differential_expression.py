@@ -37,8 +37,6 @@ def plot_des_volcano(
     if ids is not None:
         des, p_values, fc = des.loc[ids,:], p_values.loc[ids,:], fc.loc[ids,:]
     for c, ax in zip(columns, axs):
-        #fold_change = mat[numerator_samples].median(axis=1) / mat[denominator_samples].median(axis=1)
-        #fold_changes[c] = fold_change
         if categories is None:
             sbn.scatterplot(x=fc[c], y=-np.log10(p_values[c]), ax=ax, s=s, linewidth=0)
         else:

@@ -144,7 +144,6 @@ def add_simulated_condition(dataset: Dataset, condition_affected_samples: List[s
         condition_effect[mask] = rng.normal(loc=condition_log2_mean, scale=condition_log2_std, size=mask.sum())
         mask = np.abs(condition_effect) < 1
     condition_proteins['condition_effect'] = condition_effect
-    #proteins.loc[condition_proteins.index, 'condition_effect'] = condition_effect
     mapped = dataset.molecule_set.get_mapped_pairs(molecule_a="protein", molecule_b="peptide", mapping=mapping)
     mapped_condition_mask = mapped.protein.isin(condition_proteins.index)
     for sample_name, sample in tqdm(dataset.samples_dict.items()):

@@ -814,6 +814,7 @@ class Dataset:
         graph_data = dict()
         if isinstance(mappings, str):
             mappings = [mappings]
+        molecules = set()
         for mapping_name in mappings:
             mapping = self.mappings[mapping_name]
             if mapping_name in mapping_directions:
@@ -824,6 +825,8 @@ class Dataset:
             else:
                 edge_mappings = [mapping, mapping.swaplevel()]
             for mapping in edge_mappings:
+                molecules.add(mapping.mapping_molecules[0])
+                molecules.add(mapping.mapping_molecules[1])
                 identifier = (
                     mapping.mapping_molecules[0],
                     mapping_name,
@@ -837,7 +840,11 @@ class Dataset:
                     edges.append(torch.from_numpy(e_data))
                 edges = tuple(edges)
                 graph_data[identifier] = edges
-        g = dgl.heterograph(graph_data)
+        for mol in feature_columns.keys():
+            molecules.add(mol)
+        for mol in molecule_columns.keys():
+            molecules.add(mol)
+        g = dgl.heterograph(graph_data, num_nodes_dict={m: len(self.molecules[m]) for m in molecules})
         for mol, mol_features in feature_columns.items():
             if isinstance(mol_features, str):
                 mol_features = [mol_features]

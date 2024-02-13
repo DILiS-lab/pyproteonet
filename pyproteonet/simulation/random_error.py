@@ -4,10 +4,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import scipy
 
 from .utils import get_numpy_random_generator
-from ..data.molecule_set import MoleculeSet
 from ..data.dataset import Dataset
 
 

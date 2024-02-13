@@ -23,11 +23,7 @@ def plot_mapping_degree_distribution(dataset: Dataset, molecule: str, mapping: s
     degs_plot['Percentage'] = degs_plot['Count'] / dataset.molecules[molecule].shape[0] * 100
     degs_cutoff = degs_plot[degs_plot['Degree'] >= cutoff]
     degs_plot = degs_plot[degs_plot['Degree']<cutoff]
-    #degs_cutoff = degs_plot[degs_plot >= cutoff].count()
-    #degs_cutoff = degs_cutoff.groupby(degs_cutoff.index.get_level_values(-1)).count()
-    #degs_cutoff = degs_cutoff.reset_index()
     degs_cutoff['Degree'] = f'{cutoff}+'
-    #degs_cutoff.rename(columns={'index':'Type', 0:'Count'}, inplace=True)
     degs_plot = pd.concat([degs_plot, degs_cutoff], ignore_index=True)
     topk_height = math.inf
     if cut_top_k:

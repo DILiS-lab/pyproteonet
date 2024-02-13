@@ -107,9 +107,6 @@ def simulate_protein_based_log_space(
 
             peptide_abundances = peptide_abundances * peptide_flyabilities.loc[peptide_abundances.index]
             peptide_abundances *= peptide_abundance_factor
-            # peptide_error = rng.normal(
-            #     loc=0, scale= peptide_error_std_multiplier * (np.log(peptide_abundances) if error_in_log_space else peptide_abundances)
-            # )
             peptide_error = rng.normal(
                 loc=0, scale= peptide_error_std
             )

@@ -72,6 +72,11 @@ class MoleculeMapping:
     def swaplevel(self):
         mapping_molecules = self.mapping_molecules[::-1]
         df = self.df.swaplevel()
+        if mapping_molecules[0] == mapping_molecules[1]:
+            df.index.set_names(
+                (mapping_molecules[0] + "_a", mapping_molecules[1] + "_b"),
+                inplace=True,
+            )
         return MoleculeMapping(
             name=self.name, df=df, mapping_molecules=mapping_molecules
         )

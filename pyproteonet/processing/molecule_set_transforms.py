@@ -31,25 +31,15 @@ def map_protein_sequence(
     Returns:
         Optional[MoleculeSet]: The transformed input or None if inplace=True
     """
-    #molecules = input.molecules
-    #if "protein" not in molecules:
-    #    raise KeyError('MoleculeSet must have "protein" to map protein sequences.')
-    #molecules = molecules["protein"]
-    #uniprot_ids = molecules[uniprot_id_column] if uniprot_id_column is not None else molecules.index
     base_url = "http://rest.uniprot.org/uniprotkb/search"
     start = 0
     results = []
     for start in tqdm(range(0, len(uniprot_ids), request_size)):
         params = {
-            #'from': "ACC",
-            #'to': 'ACC',
             "format": "tsv",
             "query": " OR ".join([f"accession:{id}" for id in uniprot_ids[start : start + request_size] if ':' not in id and '_' not in id]),
-            #'query': " OR ".join(uniprot_ids[start:start+page_size]),
             "fields": "accession,sequence",
-            #'size': min(request_size, len(uniprot_ids) - start),
         }
-        # data = data.encode('ascii')
         response = requests.get(base_url, params=params)
         df_result = pd.read_csv(StringIO(response.content.decode("utf-8")), sep="\t")
         if len(df_result.columns) == 2:
@@ -69,15 +59,8 @@ def map_protein_sequence(
                 print('Request failed')
                 print(df_result)
     results = pd.concat(results, ignore_index=True)
-    #results.set_index("entry", drop=True, inplace=True, verify_integrity=True)
-    #assert len(results) == len(uniprot_ids) and uniprot_ids.isin(results.index).all()
     results.loc[results.sequence.isna(), "sequence"] = ""
     return results
-    if result_column is not None:
-        molecules[result_column] = results.loc[uniprot_ids, "sequence"].values
-        return molecules['sequence']
-    else:
-        return results['sequence']
 
 def num_theoretical_peptides(
     molecule_set: MoleculeSet,
