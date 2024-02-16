@@ -53,6 +53,7 @@ def load_maxlfq_benchmark_dataset(path: Optional[Path] = None)->Dataset:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(path)
     ds = load_maxquant(peptides_table=path/'peptides.txt', protein_groups_table=path/'proteinGroups.txt',
+                       protein_group_value_columns=['LFQ intensity'],
                        samples=['L1','L2','L3','H1','H2','H3'], protein_group_columns=['Fasta headers', 'Protein IDs']
                       )
     return ds

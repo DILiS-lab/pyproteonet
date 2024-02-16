@@ -17,6 +17,7 @@ def read_mapped_dataframe(
     df: pd.DataFrame,
     molecule: str,
     sample_columns: List[str],
+    molecule_columns: Optional[List[str]] = None,
     id_column: Optional[str] = None,
     result_column_name: str = "abundance",
     mapping_column: Optional[str] = None,
@@ -31,6 +32,7 @@ def read_mapped_dataframe(
         df (pd.DataFrame): The input dataframe.
         molecule (str): The name of the molecule column in the dataframe.
         sample_columns (List[str]): The list of sample columns in the dataframe.
+        molecule_columns (Optional[List[str]], optional): The list of molecule columns in the dataframe. Defaults to None.
         id_column (Optional[str], optional): The name of the ID column in the dataframe. Defaults to None.
         result_column_name (str, optional): The name of the result column in the dataframe. Defaults to "abundance".
         mapping_column (Optional[str], optional): The name of the mapping column in the dataframe. Defaults to None.
@@ -50,12 +52,16 @@ def read_mapped_dataframe(
         index.name = 'id'
         mols = pd.DataFrame(index=index)
         molecules = {molecule: mols}
+    if molecule_columns is not None:
+        if isinstance(molecule_columns, str):
+            molecule_columns = [molecule_columns]
+        molecules[molecule][molecule_columns] = df.loc[:, molecule_columns]
     mappings = {}
     if mapping_column is not None:
         mapping_mols = df[mapping_column].str.split(mapping_sep).explode()
         mapping = pd.DataFrame({molecule: df.loc[mapping_mols.index].index if id_column is None else df.loc[mapping_mols.index][id_column], mapping_molecule: mapping_mols})
         mappings[mapping_name] = mapping.set_index([molecule, mapping_molecule])
-        molecules[mapping_molecule] = pd.DataFrame(index=mapping_mols, columns=[])
+        molecules[mapping_molecule] = pd.DataFrame(index=mapping_mols.unique(), columns=[])
     ms = MoleculeSet(molecules=molecules, mappings=mappings)
     dataset = Dataset(molecule_set=ms, )
     for c in sample_columns:
@@ -96,7 +102,13 @@ def read_multiple_mapped_dataframes(
     molecules = dict()
     maps = dict()
     for mol, df in dfs.items():
-        molecules[mol] = df[molecule_columns[mol]]
+        if mol in molecule_columns:
+            cols = molecule_columns[mol]
+            if isinstance(cols, str):
+                cols = [cols]
+            molecules[mol] = df[cols]
+        else:
+            molecules[mol] = df.loc[:, []]
     for map_name, ((mol1, col1), (mol2, col2)) in mappings.items():
         mapping = pd.DataFrame({mol1: dfs[mol1].index, mol2: dfs[mol1][col1]})
         mapping[mol2] = mapping[mol2].str.split(mapping_sep)

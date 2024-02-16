@@ -13,7 +13,7 @@ def normalize_sum(
     reference_ids: Optional[pd.Index] = None,
     reference_sample: Optional[str] = None,
     result_column: Optional[str] = None,
-):
+)->pd.Series:
     if reference_sample is None:
         reference_sample = list(dataset.sample_names)[0]
     values = dataset.get_column_flat(molecule=molecule, column=column, ids=reference_ids)
