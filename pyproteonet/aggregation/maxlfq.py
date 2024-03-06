@@ -1,5 +1,6 @@
 '''
-Mostly taken from https://github.com/InfectionMedicineProteomics/DPKS/
+The implementation is a modified version of the implementation from https://github.com/InfectionMedicineProteomics/DPKS/ which is under MIT license.
+See more details and the LICENSE file in the original repository.
 '''
 
 from typing import Optional

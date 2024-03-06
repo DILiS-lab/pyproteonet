@@ -47,3 +47,4 @@ There is a `Read the Docs <https://pyproteonet.readthedocs.io/en/latest>`_ page 
 References
 ==========
 The implementation of autoencoder-based as well as collaborative-filtering-based imputation methods is taken from the `PIMMS project <https://github.com/RasmussenLab/pimms>`_.
+The implementation of MaxLFQ is a slightly modified version of the implementation of `DPKS <https://github.com/InfectionMedicineProteomics/DPKS/>`_.

@@ -10,6 +10,7 @@ ALL_IMPUTATION_METHODS = [
             "minprob",
             "mindet",
             "mean",
+            "median",
             "bpca",
             "bpca_t",
             "missforest",
@@ -31,7 +32,7 @@ def impute_molecule(
     mnar_percentile: float = 1,
     knn_k: int = 5,
     measure_runtime: bool = True,
-):
+)-> Optional[Dict[str, float]]:
     """
     Imputes missing values in a specific molecule and column of a dataset using various imputation methods.
     Currently supported methods are:
@@ -44,6 +45,8 @@ def impute_molecule(
     | minprob       | MinProb imputation (see :func:`~pyproteonet.imputation.r.impute_lcmd.min_prob_impute`)                                                                                     |
     +---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | mean          | Mean imputation across samples (see :func:`~pyproteonet.imputation.simple.across_sample_aggregate_impute` with `method` argument set to "mean")                            |
+    +---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | median        | Median imputation across samples (see :func:`~pyproteonet.imputation.simple.across_sample_aggregate_impute` with `method` argument set to "median")                        |
     +---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | bpca          | BPCA imputation (see :func:`~pyproteonet.imputation.r.pca_methods` with `method` parameter set to "bpca")                                                                  |
     +---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -79,7 +82,7 @@ def impute_molecule(
         ValueError: If the number of methods and result columns is not the same.
 
     Returns:
-        None
+        Optional[Dict[str, float]]: A dictionary containing the runtimes of the imputation methods if `measure_runtime` is set to `True`.
     """
     runtimes = dict()
     if isinstance(methods, str):
@@ -103,6 +106,9 @@ def impute_molecule(
     if 'mean' in methods_set:
         from pyproteonet.imputation.simple import across_sample_aggregate_impute
         method_fns['mean'] = partial(across_sample_aggregate_impute, method="mean", all_missing_percentile=mnar_percentile)
+    if 'median' in methods_set:
+        from pyproteonet.imputation.simple import across_sample_aggregate_impute
+        method_fns['median'] = partial(across_sample_aggregate_impute, method="median", all_missing_percentile=mnar_percentile)
     if 'bpca' in methods_set:
         from pyproteonet.imputation.r.pca_methods import impute_pca_method
         method_fns['bpca'] = partial(impute_pca_method, method="bpca")
